@@ -1,0 +1,37 @@
+server:
+  http:
+    addr: 0.0.0.0:8001
+    timeout: 180s
+  grpc:
+    addr: 0.0.0.0:9001
+    timeout: 180s
+data:
+  database:
+    driver: mysql
+    source: root:lasvsim0216@tcp(8.146.201.197:30306)/dev_resource?charset=utf8&parseTime=true
+  discovery:
+    mock:
+      scenario:
+        services:
+          - id: scenario
+            endpoints:
+              - grpc://123.56.224.166:9001
+      bff:
+        services:
+          - id: scenario
+            endpoints:
+              - grpc://123.56.224.166:9002
+  file_conf:
+    mode: 1
+    minioConf:
+      AccessKey: ZZKHJ0sp3V4YhXo0
+      SecretKey: TOdH9aYzF4HrcE3AOpjOmPhDwLhN72tH
+      Bucket: task-dev
+      EndPoint: 8.146.201.197:31001
+  mongo:
+    addr: mongodb://root:root@localhost:32017
+    db: dev_inference
+  log_config:
+    level: WarnLevel
+    encoding: console
+    output_paths: ["lumber://logs/lasvsim.log"]

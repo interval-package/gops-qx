@@ -170,4 +170,10 @@ experiment
 # network file
 /transform_onnx_network/*
 
+# qianxing render
 /draw_qianxing/*
+
+# localsim files
+localsim/*.log
+localsim/logs/*
+localsim/*.pid
