@@ -1,4 +1,4 @@
-name: gops_client
+name: gops_qx
 
 channels:
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge
@@ -7,7 +7,7 @@ channels:
 dependencies:
   - python=3.9
   - pytorch>=1.13.0
-  - numpy>1.16.0
+  - numpy=1.26.4
   - pandas
   - tensorboard>=2.5.0
   - matplotlib

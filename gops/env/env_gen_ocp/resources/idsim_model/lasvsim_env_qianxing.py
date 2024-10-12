@@ -63,7 +63,7 @@ class LasvsimEnv(gym.Env):
         model_config: Dict = {},
         port: int = 8000,
         render_flag: bool = False,
-        render_ret: dict = {},
+        render_info: dict = {},
         task_id = 85,
         **kwargs: Any,
     ):  
@@ -187,10 +187,10 @@ class LasvsimEnv(gym.Env):
         self.ref_index = 0
         if self.render_flag:
             f = plt.figure(figsize=(16,9))
-            self.drawer_path_debug = f"./draw_qianxing/{render_ret['policy']}/" + time.strftime("%m-%d-%H:%M:%S")
-            render_ret["path"] = self.drawer_path_debug
-            self.show_npc = render_ret["show_npc"]
-            self.draw_bound = render_ret["draw_bound"]
+            self.drawer_path_debug = f"./draw_qianxing/{render_info['policy']}/" + time.strftime("%m-%d-%H:%M:%S")
+            render_info["path"] = self.drawer_path_debug
+            self.show_npc = render_info["show_npc"]
+            self.draw_bound = render_info["draw_bound"]
             if not os.path.exists(self.drawer_path_debug):
                 os.makedirs(self.drawer_path_debug)
             self.map = Map()

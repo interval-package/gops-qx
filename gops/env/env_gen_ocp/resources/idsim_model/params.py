@@ -2,6 +2,8 @@ import numpy as np
 from typing import List, Tuple
 from omegaconf import OmegaConf
 from dataclasses import dataclass
+import os
+
 @dataclass(frozen=False)
 class ModelConfig():
     N: int = 10
@@ -96,27 +98,30 @@ model_config = {
     "filter_num": 0,  # only for extra filter
 }
 
+
+"""
+Most essential, need to caution
+"""
+
 qianxing_config = {
-    'token':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjQsIm9pZCI6MTAxLCJuYW1lIjoi6YK55paH5L-KIiwiaWRlbnRpdHkiOiJub3JtYWwiLCJwZXJtaXNzaW9ucyI6W10sImlzcyI6InVzZXIiLCJzdWIiOiJMYXNWU2ltIiwiZXhwIjoxNzI2NjM4NDc5LCJuYmYiOjE3MjYwMzM2NzksImlhdCI6MTcyNjAzMzY3OSwianRpIjoiNCJ9.tmpS3YKMjE-ofu-_yuu2RsSitpsKYbWuAz8hbLnUqo8',
-    'task_id': 87,
+    'token':None,
+    'task_id': 81,
     'record_id': [1, 2, 3], ## simulation id list
     'b_surr': True,
     "render_flag": False,
-    "render_ret": {
+    "render_info": {
         "draw_bound": 30,
         "show_npc": True
         },
 }
 
-# qianxing_config = {
-    
-#     # 'token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjg5LCJvaWQiOjEwMSwibmFtZSI6IueOi-S7peivuiIsImlkZW50aXR5Ijoibm9ybWFsIiwicGVybWlzc2lvbnMiOltdLCJpc3MiOiJ1c2VyIiwic3ViIjoiTGFzVlNpbSIsImV4cCI6MTcxOTYyODQ2NiwibmJmIjoxNzE5MDIzNjY2LCJpYXQiOjE3MTkwMjM2NjYsImp0aSI6Ijg5In0.TqCkNWn-9bOZEAGMLq5-F8-N6OAfmp19cyoFPtzQuII',
-#     'token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjIxOCwib2lkIjowLCJuYW1lIjoi5byg6aOe6bi_IiwiaWRlbnRpdHkiOiJub3JtYWwiLCJwZXJtaXNzaW9ucyI6W10sImlzcyI6InVzZXIiLCJzdWIiOiJMYXNWU2ltIiwiZXhwIjoxNzIyNjY2MTM5LCJuYmYiOjE3MjIwNjEzMzksImlhdCI6MTcyMjA2MTMzOSwianRpIjoiMjE4In0.-JCd0bNRAutBBCQ81mATzPRwr-EQeqjtFVxPx_I2KG8',
-#     'task_id': 8124,
-#     # 'record_id': [1, 2, 3, 4, 5],
-#     'record_id': 13303,
-#     'b_surr':True
-# }
+token_path = "qx.token"
+if os.path.exists(token_path):
+    with open(token_path, 'r') as file:
+        token_str = file.read()
+        qianxing_config["token"] = token_str
+else:
+    raise FileNotFoundError("Cannot find token file.")
 
 noise_params = {
     "passenger": {

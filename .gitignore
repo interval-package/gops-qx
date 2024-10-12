@@ -9,10 +9,6 @@ __pycache__/
 diff.txt
 draw_qianxing/*
 
-#add by SUN-Hao
-gops/.idea/*
-.idea/
-
 # training results
 /results/*
 !/results/FHADP
@@ -48,6 +44,7 @@ example_train/vehicle.json
 !/results/SPIL
 /results/SPIL/*
 !/results/SPIL/mobilerobot
+figures/
 
 
 .idea/*
@@ -58,7 +55,7 @@ example_train/vehicle.json
 *.pkl
 *.onnx
 
-figures/
+
 # Distribution / packaging
 .Python
 build/
@@ -177,3 +174,6 @@ experiment
 localsim/*.log
 localsim/logs/*
 localsim/*.pid
+
+# token
+qx.token

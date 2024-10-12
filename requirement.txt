@@ -1,0 +1,12 @@
+ray[default]
+gym==0.23.1
+gymnasium
+box2d
+pygame
+pyglet
+slxpy
+openpyxl
+intel-openmp
+pytest
+onnx
+onnxruntime
