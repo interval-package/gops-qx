@@ -111,7 +111,9 @@ qianxing_config = {
     "render_flag": False,
     "render_info": {
         "draw_bound": 30,
-        "show_npc": True
+        "show_npc": True,
+        "type": ".png",
+        "dpi": 300
         },
 }
 

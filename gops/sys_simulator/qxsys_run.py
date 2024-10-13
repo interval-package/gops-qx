@@ -281,7 +281,7 @@ class PolicyRunner:
             tracking_dict = state_with_ref_error
         else:
             tracking_dict = {}
-        self.plot_evaluation(episode_index=0, eval_dict=plot_dict, reward_dict=reward_dict)
+        # self.plot_evaluation(episode_index=0, eval_dict=plot_dict, reward_dict=reward_dict)
         
         return eval_dict, tracking_dict
     

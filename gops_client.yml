@@ -40,5 +40,4 @@ dependencies:
     - onnx
     - onnxruntime
     - opencv-python
-    - fitz
 

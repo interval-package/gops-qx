@@ -200,6 +200,7 @@ class LasvsimEnv(gym.Env):
             
             f.subplots_adjust(left=0.25)
             self.map.draw_everything(show_id=False, show_link_boundary=False)
+            self.render_config = render_info
         # self.max_step = env_config["max_steps"]
 
     # _buffered_reward:tuple = (None, {})
@@ -552,7 +553,7 @@ class LasvsimEnv(gym.Env):
         car_rectangles.append(ego_car_t)
         
         self.count += 1 
-        f.savefig(os.path.join(f"{self.drawer_path_debug}", str(self.count) + ".pdf"), dpi=2000)
+        f.savefig(os.path.join(f"{self.drawer_path_debug}", str(self.count) + self.render_config["type"]), dpi=self.render_config["dpi"])
         for text_obj in text_objs:
             text_obj.remove()
         for car in car_rectangles:
