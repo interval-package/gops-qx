@@ -163,7 +163,7 @@ class PolicyRunner:
             algs_name + self.env_id,
             datetime.datetime.now().strftime("%y%m%d-%H%M%S"),
         )
-        os.makedirs(self.save_path, exist_ok=True)
+        # os.makedirs(self.save_path, exist_ok=True)
 
     def run_an_episode(
         self,

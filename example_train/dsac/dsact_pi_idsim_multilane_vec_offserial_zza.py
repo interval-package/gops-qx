@@ -90,7 +90,7 @@ if __name__ == "__main__":
     parser.add_argument("--is_constrained", type=bool, default=False, help="Adversary training")
     # 1.1 Parameters for qianxing
     # using `qianxingp_` + `value`
-    parser.add_argument("--qianxingp_task_id", type=int, default=81, help="Qianxing task id")
+    parser.add_argument("--qianxingp_task_id", type=int, default=82, help="Qianxing task id")
     parser.add_argument("--qianxingp_token", type=int, default=None, help="Qianxing task id")
 
     ################################################
@@ -274,7 +274,7 @@ if __name__ == "__main__":
     # Save value/policy every N updates
     parser.add_argument("--apprfunc_save_interval", type=int, default=1000)
     # Save key info every N updates
-    parser.add_argument("--log_save_interval", type=int, default=10)
+    parser.add_argument("--log_save_interval", type=int, default=1000)
 
     ################################################
     eval_env_config = {

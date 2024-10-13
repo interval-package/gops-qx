@@ -3,6 +3,7 @@ import fitz  # PyMuPDF
 from PIL import Image
 import os, cv2
 import numpy as np
+import tqdm
 
 def pdf_to_image(pdf_path, zoom=0.3):
     pdf_document = fitz.open(pdf_path)
@@ -14,7 +15,6 @@ def pdf_to_image(pdf_path, zoom=0.3):
     
     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
     return img
-
 
 
 def images_to_gif(images, gif_path, duration=500):
@@ -48,10 +48,9 @@ def process_batch(img_folder, name="result"):
     # 将文件名转换为整数进行排序
     img_files.sort(key=lambda x: int(os.path.splitext(x)[0]))
     images= []
-    
-    for file_name in img_files:
+    pbar = tqdm.tqdm(img_files)
+    for file_name in pbar:
         if file_name.endswith(".pdf"):
-            print("processing: " + file_name)
             img_path = os.path.join(img_folder, file_name)
             try:
                 img = pdf_to_image(img_path, zoom=1)  # 更小的缩放比例
@@ -59,7 +58,6 @@ def process_batch(img_folder, name="result"):
             except Exception as e:
                 print(f"Error processing {img_path}: {e}")
         elif file_name.endswith(".png"):
-            print("processing: " + file_name)
             img_path = os.path.join(img_folder, file_name)
             try:
                 img = Image.open(img_path)
