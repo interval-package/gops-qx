@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        h2 {
+            color: #555;
+        }
+
+        h3 {
+            color: #777;
+        }
+
+        pre {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            padding: 10px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        code {
+            background-color: #eaeaea;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+
+        .response {
+            background-color: #e9f7ef;
+            border-left: 5px solid #28a745;
+            padding: 10px;
+            margin: 10px 0;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border-left: 5px solid #dc3545;
+            padding: 10px;
+            margin: 10px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>API Documentation for Model and Trajectory Management</h1>
+
+    <h2>Base URL</h2>
+    <pre><code>http://&lt;server_host&gt;:2790</code></pre>
+
+    <h2>Endpoints</h2>
+
+    <h3>1. Get Model Version</h3>
+    <p><strong>Endpoint:</strong> <code>/info/mdlversion</code></p>
+    <p><strong>Method:</strong> GET</p>
+    <p><strong>Description:</strong> Retrieves the current model version.</p>
+    <p><strong>Response:</strong></p>
+    <div class="response">
+        <strong>Status Code:</strong> 200 OK<br>
+        <strong>Content:</strong>
+        <pre><code>{
+    "version": "x.x.x"
+}</code></pre>
+    </div>
+
+    <h3>2. Get Trajectory Version</h3>
+    <p><strong>Endpoint:</strong> <code>/info/trajversion</code></p>
+    <p><strong>Method:</strong> GET</p>
+    <p><strong>Description:</strong> Retrieves the current trajectory version.</p>
+    <p><strong>Response:</strong></p>
+    <div class="response">
+        <strong>Status Code:</strong> 200 OK<br>
+        <strong>Content:</strong>
+        <pre><code>{
+    "version": "x.x.x"
+}</code></pre>
+    </div>
+
+    <h3>3. List Model Files</h3>
+    <p><strong>Endpoint:</strong> <code>/info/mdllist</code></p>
+    <p><strong>Method:</strong> GET</p>
+    <p><strong>Description:</strong> Lists all available model version files in CSV format.</p>
+    <p><strong>Response:</strong></p>
+    <div class="response">
+        <strong>Status Code:</strong> 200 OK<br>
+        <strong>Content:</strong>
+        <pre><code>{
+    "model_files": ["model_v1.0.0.onnx", "model_v1.0.1.onnx"]
+}</code></pre>
+    </div>
+
+    <h3>4. List Trajectory Files</h3>
+    <p><strong>Endpoint:</strong> <code>/info/trajlist</code></p>
+    <p><strong>Method:</strong> GET</p>
+    <p><strong>Description:</strong> Lists all available trajectory files in CSV format.</p>
+    <p><strong>Response:</strong></p>
+    <div class="response">
+        <strong>Status Code:</strong> 200 OK<br>
+        <strong>Content:</strong>
+        <pre><code>{
+    "traj_files": ["traj_v1.0.0.idx.csv", "traj_v1.0.1.idx.csv"]
+}</code></pre>
+    </div>
+
+    <h3>5. Download Model</h3>
+    <p><strong>Endpoint:</strong> <code>/download/model/&lt;version&gt;</code></p>
+    <p><strong>Method:</strong> GET</p>
+    <p><strong>Description:</strong> Downloads the specified model version file.</p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+        <li><strong>Path Parameter:</strong> <code>version</code> (string): The version of the model to download (format: <code>x.x.x</code>).</li>
+    </ul>
+    <p><strong>Response:</strong></p>
+    <div class="response">
+        <strong>Status Code:</strong> 
+        <ul>
+            <li>200 OK: File is successfully downloaded.</li>
+            <li>404 Not Found: The specified model version file does not exist.</li>
+        </ul>
+    </div>
+
+    <h3>6. Download Trajectory</h3>
+    <p><strong>Endpoint:</strong> <code>/download/traj/&lt;version&gt;</code></p>
+    <p><strong>Method:</strong> GET</p>
+    <p><strong>Description:</strong> Downloads the specified trajectory file.</p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+        <li><strong>Path Parameter:</strong> <code>version</code> (string): The version of the trajectory to download (format: <code>x.x.x</code>).</li>
+    </ul>
+    <p><strong>Response:</strong></p>
+    <div class="response">
+        <strong>Status Code:</strong> 
+        <ul>
+            <li>200 OK: File is successfully downloaded.</li>
+            <li>404 Not Found: The specified trajectory version file does not exist.</li>
+        </ul>
+    </div>
+
+    <h3>7. Upload File</h3>
+    <p><strong>Endpoint:</strong> <code>/upload/&lt;type&gt;</code></p>
+    <p><strong>Method:</strong> POST or PUT</p>
+    <p><strong>Description:</strong> Uploads a model or trajectory file.</p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+        <li><strong>Path Parameter:</strong> <code>type</code> (string): The type of file to upload (<code>model</code> or <code>traj</code>).</li>
+        <li><strong>Form Data:</strong> <code>file</code> (file): The file to upload.</li>
+    </ul>
+    <p><strong>Response:</strong></p>
+    <div class="response">
+        <strong>Status Code:</strong> 
+        <ul>
+            <li>200 OK: File uploaded successfully.</li>
+            <li>400 Bad Request: No file part in the request or no selected file.</li>
+            <li>500 Internal Server Error: Internal error occurred during processing.</li>
+        </ul>
+    </div>
+
+    <h2>Error Handling</h2>
+    <p>The API returns standard HTTP status codes for error handling. The following codes may be encountered:</p>
+    <ul>
+        <li><strong>400 Bad Request:</strong> Invalid request parameters or missing file.</li>
+        <li><strong>404 Not Found:</strong> Requested resource could not be found.</li>
+        <li><strong>500 Internal Server Error:</strong> An unexpected error occurred on the server.</li>
+    </ul>
+
+    <h2>Notes</h2>
+    <ul>
+        <li>Ensure that file names adhere to the specified naming conventions:
+            <ul>
+                <li>Model files: <code>x.x.x.onnx</code></li>
+                <li>Trajectory files: <code>x.x.x.idx.csv</code></li>
+            </ul>
+        </li>
+        <li>All responses are returned in JSON format, with error messages clearly stated.</li>
+    </ul>
+
+    <h2>Conclusion</h2>
+    <p>This API provides a structured approach to manage model and trajectory files, allowing for easy uploads, downloads, and retrieval of version information. For further assistance, contact the API provider or refer to the codebase for detailed implementation insights.</p>
+
+</body>
+
+</html>
