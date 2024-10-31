@@ -268,6 +268,7 @@ class LasvsimEnv(gym.Env):
                 trainsim_pb2.StopReq(simulation_id=self.startResp.simulation_id),
                 metadata=self.metadata,
             )
+        
     def reset(self, expect_direction, options: dict = None, **kwargs) -> np.ndarray:
         self.step_counter = 0
         assert expect_direction in ["left", "right", "straight", "uturn"]

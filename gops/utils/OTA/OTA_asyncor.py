@@ -1,6 +1,7 @@
 import os
 import requests
 import argparse
+from gops.utils.OTA.onnx.dsac import onnx_dsac
 from typing import Tuple
 
 class OTA_asyncor:
@@ -18,10 +19,10 @@ class OTA_asyncor:
         self.port = port
         self.base_url = f"http://{host}:{port}"
 
-    def async_mdl(self, version, iteration):
+    def async_mdl(self, version, iteration=None):
         local_onnx_list = self.util_get_file_list(self.onnx_dir, ".onnx")
-        local_traj_list = self.util_get_file_list(self.traj_dir, ".csv")
-        local_mdl_list = self.util_get_file_list(self.model_dir, ".pkl")
+        # local_traj_list = self.util_get_file_list(self.traj_dir, ".csv")
+        # local_mdl_list = self.util_get_file_list(self.model_dir, ".pkl")
         return
 
     def async_traj(self, version:str=None, idx:int=None):
@@ -30,6 +31,13 @@ class OTA_asyncor:
         """
         local_traj_list = self.util_get_file_list(self.traj_dir, ".csv")
         return
+
+    def local_get_opt_mdl(self):
+        local_mdl_list = self.util_get_file_list(self.model_dir, ".pkl")
+        miter, optiter = self.util_get_opt(local_mdl_list, self.util_parse_apprname)
+        return os.path.join(self.model_dir, f"apprfunc_{miter if optiter < 0 else f'{optiter}_opt'}.pkl")
+
+    ## Comunicate
 
     def upload_model(self, model_path: str) -> Tuple[bool, str]:
         """
@@ -184,6 +192,16 @@ class OTA_asyncor:
         iteration = int(apprname[:-3] if is_opt else apprname)
         return iteration, is_opt
 
+    @staticmethod
+    def util_get_opt(file_list, parse_func):
+        miter = -1
+        optiter = -1
+        for fname in file_list:
+            iter, is_opt = parse_func(fname)
+            optiter = iter if is_opt else optiter
+            miter = max(iter, miter)
+        return miter, optiter
+
 def OTA_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="localhost")
@@ -198,7 +216,7 @@ def main():
     ckpt = args.ckpt
     OTA_asyncor(*OTA_asyncor.util_make_dir(ckpt), **args)
 
-
+    OTA_asyncor.async_mdl(version="1.0.1")
 
     return
 
