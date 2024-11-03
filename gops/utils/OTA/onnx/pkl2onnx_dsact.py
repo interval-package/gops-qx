@@ -36,9 +36,9 @@ sys.path.append(alg_path)
 
 ##########################DSACT network pkl2onnx#################
 
-def __load_args(log_policy_dir):
+def _load_args(log_policy_dir):
     log_policy_dir = log_policy_dir
-    json_path = os.path.join("res/", "config.json")
+    json_path = os.path.join(log_policy_dir, "config.json")
     parser = argparse.ArgumentParser()
     args_dict = vars(parser.parse_args())
     args = get_args_from_json(json_path, args_dict)
@@ -132,12 +132,11 @@ def DSAC_Q2_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir,
     torch.onnx.export(model, example_obs_act, output_onnx_model, input_names=['input'], output_names=['output'],
                           opset_version=11)
 
-if __name__=='__main__':
-
+def main():
     # Load trained policy
-    log_policy_dir = "res/"
-    index = 474000
-    args = __load_args(log_policy_dir)
+    log_policy_dir = "/home/zhengziang/code/gops-qx/results/pyth_idsim/DSACTPI_241013-023014"
+    index = 1000
+    args = _load_args(log_policy_dir)
     alg_name = args["algorithm"]
     alg_file_name = alg_name.lower()
     file = importlib.import_module("gops.algorithm." + alg_file_name)
@@ -145,8 +144,8 @@ if __name__=='__main__':
     networks = ApproxContainer(**args)
 
     # Load trained policy
-    log_path = "res/apprfunc_{}.pkl".format(f'{index}')  # network position
-    networks.load_state_dict(torch.load(log_path))
+    log_path = log_policy_dir+"/apprfunc/apprfunc_{}.pkl".format(f'{index}')  # network position
+    networks.load_state_dict(torch.load(log_path, weights_only=True))
     networks.eval()
 
     # DSAC
@@ -165,9 +164,9 @@ if __name__=='__main__':
         "num_objs": num_objs,
         "num_ref_points": num_ref_points,
     }
-    policy_dir = os.path.join(gops_path, 'dsac_policy3.onnx')
-    Q1_dir = os.path.join(gops_path, 'dsac_q1.onnx')
-    Q2_dir = os.path.join(gops_path, 'dsac_q2.onnx')
+    policy_dir = os.path.join(log_policy_dir, 'dsac_policy3.onnx')
+    Q1_dir = os.path.join(log_policy_dir, 'dsac_q1.onnx')
+    Q2_dir = os.path.join(log_policy_dir, 'dsac_q2.onnx')
     action_upper_bound = args["env_config"]["action_upper_bound"]
     action_lower_bound = args["env_config"]["action_lower_bound"]    
     action_scale_factor = 1
@@ -201,3 +200,59 @@ if __name__=='__main__':
     print(outputs_value)
     value = networks.q1(torch.tensor(example_obs_act)[:,:-act_dim]*obs_scale_factor,torch.tensor(example_obs_act)[:,-act_dim:])
     print(value)
+
+def onnx_brute_force(mdl_path, cfgs, output_dir):
+    alg_name = cfgs["algorithm"]
+    alg_file_name = alg_name.lower()
+    file = importlib.import_module("gops.algorithm." + alg_file_name)
+    ApproxContainer = getattr(file, "ApproxContainer")
+    networks = ApproxContainer(**cfgs)
+    networks.load_state_dict(torch.load(mdl_path, weights_only=True))
+    networks.eval()
+
+    # DSAC
+    obs_dim = cfgs["obsv_dim"]
+    act_dim = cfgs["action_dim"]
+    ego_dim = cfgs["env_model_config"]["ego_feat_dim"]
+    sur_dim = cfgs["env_model_config"]["per_sur_feat_dim"] + 3 # +3 for length, width, mask
+    ref_dim = cfgs["env_model_config"]["per_ref_feat_dim"]
+
+    num_ref_points = len(cfgs["env_model_config"]["downsample_ref_point_index"])
+    num_objs = int(sum(i for i in cfgs["env_config"]["obs_num_surrounding_vehicles"].values()))
+    obs_dict = {
+        "ego_dim": ego_dim,
+        "sur_dim": sur_dim,
+        "ref_dim": ref_dim,
+        "num_objs": num_objs,
+        "num_ref_points": num_ref_points,
+    }
+    action_scale_factor = 1
+    action_scale_bias = 0
+
+    obs_scale_factor = cfgs["obs_scale"]
+    obs_scale_factor = torch.tensor(obs_scale_factor).float()
+    DSAC_policy_export_onnx_model(networks, obs_dim, output_dir,action_scale_factor,obs_scale_factor,action_scale_bias,obs_dict)
+
+if __name__=='__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ckpt", required=True)
+    parser.add_argument("--source", required=True)
+    parser.add_argument("--target", required=True)
+    args = parser.parse_args()
+    # main()
+    # log_policy_dir = "/home/zhengziang/code/gops-qx/results/pyth_idsim/DSACTPI_241013-023014"
+    # source = "results/pyth_idsim/DSACTPI_241013-023014/apprfunc/apprfunc_1000.pkl"
+    # target = "results/pyth_idsim/DSACTPI_241013-023014/onnx/1.0.0.0.onnx"
+    log_policy_dir = args.ckpt
+    source = args.source
+    target = args.target
+
+    json_path = os.path.join(log_policy_dir, "config.json")
+    import json
+
+    summary_filename = json_path
+    with open(summary_filename) as f:
+        summary_dict = json.load(fp=f)
+    args = summary_dict
+
+    onnx_brute_force(source, args, target)

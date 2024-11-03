@@ -1,28 +1,100 @@
-import os
+import importlib
+import contextlib
+import os, sys
+import json
 import requests
 import argparse
+import torch
+import onnxruntime as ort
 from gops.utils.OTA.onnx.dsac import onnx_dsac
 from typing import Tuple
+import subprocess
+
+from gops.utils.OTA.onnx.pkl2onnx_dsact import \
+    DSAC_policy_export_onnx_model, onnx_brute_force, _load_args
+
+onnx_script = "gops/utils/OTA/onnx/pkl2onnx_dsact.py"
+
+"""
+Only upload policy
+"""
 
 class OTA_asyncor:
-    def __init__(self, model_dir: str, traj_dir: str, onnx_dir: str, host="localhost", port=2790, **kwargs):
-        self.model_dir = model_dir
-        self.traj_dir = traj_dir
-        self.onnx_dir = onnx_dir
+    def __init__(self, ckpt_dir, host="localhost", port=2790, **kwargs):
+        self.ckpt_dir = ckpt_dir
+        self.model_dir, self.traj_dir, self.onnx_dir = self.util_make_dir(ckpt_dir)
 
         # Create directories if they don't exist
-        os.makedirs(onnx_dir, exist_ok=True)
-        os.makedirs(traj_dir, exist_ok=True)
+        os.makedirs(self.onnx_dir, exist_ok=True)
+        os.makedirs(self.traj_dir, exist_ok=True)
         
+        # parsing config
+        config_file = os.path.join(ckpt_dir, "config.json")
+        # with open(config_file) as f:
+        #     config = json.load(fp=f)
+        self.config = _load_args(ckpt_dir)
+        self.parse_model_config()
+
         # Server details
         self.host = host
         self.port = port
         self.base_url = f"http://{host}:{port}"
 
+    def parse_model_config(self):
+        args = self.config
+        obs_dim = args["obsv_dim"]
+        act_dim = args["action_dim"]
+        ego_dim = args["env_model_config"]["ego_feat_dim"]
+        sur_dim = args["env_model_config"]["per_sur_feat_dim"] + 3 # +3 for length, width, mask
+        ref_dim = args["env_model_config"]["per_ref_feat_dim"]
+
+        num_ref_points = len(args["env_model_config"]["downsample_ref_point_index"])
+        num_objs = int(sum(i for i in args["env_config"]["obs_num_surrounding_vehicles"].values()))
+        obs_dict = {
+            "ego_dim": ego_dim,
+            "sur_dim": sur_dim,
+            "ref_dim": ref_dim,
+            "num_objs": num_objs,
+            "num_ref_points": num_ref_points,
+        }
+        action_upper_bound = args["env_config"]["action_upper_bound"]
+        action_lower_bound = args["env_config"]["action_lower_bound"]    
+        action_scale_factor = 1
+        action_scale_bias = 0
+        obs_scale_factor = args["obs_scale"]
+        obs_scale_factor = torch.tensor(obs_scale_factor).float()
+        cfg = {
+            "input_dim": obs_dim,
+            "act_scale_factor": action_scale_factor,
+            "obs_scale_factor": obs_scale_factor,
+            "bias": action_scale_bias,
+            "obs_config": obs_dict
+        }
+        self.onnx_cfg = cfg
+
+        alg_file_name = args["algorithm"].lower()
+        file = importlib.import_module("gops.algorithm." + alg_file_name)
+        self.networks = getattr(file, "ApproxContainer")(**args)
+
     def async_mdl(self, version, iteration=None):
-        local_onnx_list = self.util_get_file_list(self.onnx_dir, ".onnx")
         # local_traj_list = self.util_get_file_list(self.traj_dir, ".csv")
-        # local_mdl_list = self.util_get_file_list(self.model_dir, ".pkl")
+        local_mdl_list = self.util_get_file_list(self.model_dir, ".pkl")
+        assert local_mdl_list, "The mdls are empty"
+        liter, _ = self.util_get_opt(local_mdl_list, self.util_parse_apprname)
+        success, download_info = self.get_model_version()        
+        mdl_version = version
+        mdl_path = os.path.join(self.model_dir, f"apprfunc_{liter}.pkl")
+        onnx_path = os.path.join(self.onnx_dir, f"{mdl_version}.onnx")
+
+        print(f"Onnxlize the {mdl_path} to {onnx_path}...")
+        result = subprocess.run(['python', onnx_script, '--ckpt', self.ckpt_dir, '--source', mdl_path, '--target', onnx_path], check=True)
+        print("Script finished with exit code:", result.returncode)
+        
+        success, upload_info = self.upload_model(onnx_path)
+        if success:
+            print("Successfully uploading.")
+        else:
+            print(f"Fail to upload, report: {upload_info}")
         return
 
     def async_traj(self, version:str=None, idx:int=None):
@@ -206,19 +278,25 @@ def OTA_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", default=5000)
-    parser.add_argument("--ckpt", type=str)
+    parser.add_argument("--ckpt_dir", type=str)
     args = parser.parse_args()
-    assert os.path.exists(args.ckpt), "No such info saved."
+    assert os.path.exists(args.ckpt_dir), "No such info saved."
     return args
 
 def main():
-    args = OTA_parser()
-    ckpt = args.ckpt
-    OTA_asyncor(*OTA_asyncor.util_make_dir(ckpt), **args)
-
-    OTA_asyncor.async_mdl(version="1.0.1")
-
+    # args = OTA_parser()
+    # ckpt = args.ckpt
+    ckpt_dir = "results/pyth_idsim/DSACTPI_241013-023014"
+    args_debug = {
+        "host": "localhost",
+        "port": 2790,
+        "ckpt_dir": ckpt_dir,
+    }
+    obj = OTA_asyncor(**args_debug)
+    obj.async_mdl(version="1.0.1")
     return
 
-if __name__ == "__main__":
+
+if __name__== '__main__':
+    main()
     pass
