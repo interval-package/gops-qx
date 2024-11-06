@@ -6,8 +6,8 @@ if __name__ == "__main__":
 
     qianxing_config["render_flag"] = True
 
-    policy = "/home/zhengziang/code/gops-qx/results/pyth_idsim/DSACTPI_241012-143200"
-    model = "500000"
+    policy = "/home/idlaber24/code/gops-qx/results/pyth_idsim/DSACTPI_241106-155249"
+    model = "46000"
     policy_name = policy.split("/")[-1]
     policy_idxs = [0]
 
@@ -33,14 +33,16 @@ if __name__ == "__main__":
     )
 
     for pidx in policy_idxs:
+        print(runner.args_list[pidx]["qianxingp_task_id"])
         run_config = {
             "policy": policy_name,
             "draw_bound": 30,
             "show_npc": False,
-            "task_id": runner.args_list[pidx]["qianxingp_task_id"]
         }
 
         qianxing_config["render_info"].update(run_config)
+        qianxing_config["task_id"] = runner.args_list[pidx]["qianxingp_task_id"]
+
 
         runner.run_single(pidx)
 

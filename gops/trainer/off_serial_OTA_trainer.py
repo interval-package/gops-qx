@@ -3,7 +3,7 @@ import os
 from gops.utils.OTA.OTA_asyncor import OTA_asyncor
 from gops.trainer.off_serial_idsim_trainer import OffSerialIdsimTrainer
 
-class OffSerialOTArainer(OffSerialIdsimTrainer):
+class OffSerialOTATrainer(OffSerialIdsimTrainer):
     def __init__(self, alg, sampler, buffer, evaluator, OTA_config, **kwargs):
         super().__init__(alg, sampler, buffer, evaluator, **kwargs)
         model_dir = os.path.join(self.save_folder, "apprfunc")

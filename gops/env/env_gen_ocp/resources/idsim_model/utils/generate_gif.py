@@ -43,7 +43,7 @@ def images_to_mp4(images: List[Image.Image], gif_path, duration=0.3):
 
 def process_batch(img_folder, name="result"):
     # 获取所有文件名，并按数字排序
-    img_files = [f for f in os.listdir(img_folder) if f.lower().endswith('.pdf')]
+    img_files = [f for f in os.listdir(img_folder) if f.lower().endswith('.png')]
     
     # 将文件名转换为整数进行排序
     img_files.sort(key=lambda x: int(os.path.splitext(x)[0]))

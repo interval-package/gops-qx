@@ -61,7 +61,7 @@ class CloudServer:
         print(env_config_dict)
         env_config = Config.from_partial_dict(env_config_dict)
         model_config = ModelConfig.from_partial_dict(model_config_dict)
-        self.env = LasvsimEnv(**qianxing_config,env_config=env_config_dict,model_config=model_config_dict) ##TODO:add the vector_env list
+        self.env = LasvsimEnv(**qianxing_config, env_config=env_config_dict,model_config=model_config_dict) ##TODO:add the vector_env list
         self.model = IdSimModel(env_config, model_config)
 
     def reset_idsim(self, options: List[dict] = None):
@@ -168,7 +168,7 @@ class idSimEnv(Env):
         self.lc_cooldown_counter += 1
         if self.lc_cooldown_counter > self.lc_cooldown:
             # lane change is allowable
-            obs, reward, terminated, truncated, info = self.server.step_idsim(action,False)
+            obs, reward, terminated, truncated, info = self.server.step_idsim(action, False)
             self.lc_cooldown_counter = 0
         else:
             obs, reward, terminated, truncated, info = self.server.step_idsim(action, False)

@@ -24,7 +24,10 @@ from gops.create_pkg.create_evaluator import create_evaluator
 from gops.create_pkg.create_sampler import create_sampler
 from gops.create_pkg.create_trainer import create_trainer
 from gops.utils.init_args import init_args
+# ======crossroad config===========
 from gops.env.env_gen_ocp.resources.idsim_config_multilane import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
+# ======multilane config===========
+# from gops.env.env_gen_ocp.resources.idsim_config_multilane_bc import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
 
 os.environ['RAY_memory_monitor_refresh_ms'] = "0"  # disable memory monitor
 if __name__ == "__main__":

@@ -64,7 +64,7 @@ class LasvsimEnv(gym.Env):
         port: int = 8000,
         render_flag: bool = False,
         render_info: dict = {},
-        task_id = 85,
+        task_id = None,
         **kwargs: Any,
     ):  
         self.count = 0
@@ -78,7 +78,8 @@ class LasvsimEnv(gym.Env):
         self.lanes = dict()
         self.segments = dict()
         self.links = dict()
-        print(token)
+        assert task_id is not None, "invalid task id"
+        print(f"task id: {task_id}\n", token)
         self.sce_insecure_channel = grpc.insecure_channel('localhost:9001')
         self.sce_channel = grpc.intercept_channel(self.sce_insecure_channel.__enter__(),LoggingInterceptor())
         self.sce_stub = train_task_pb2_grpc.TrainTaskStub(self.sce_channel)
@@ -211,7 +212,7 @@ class LasvsimEnv(gym.Env):
         action = self.inverse_normalize_action(action)
         self.action = self.last_action + action
         # print("action incre: ",action)
-        print("action1: ",self.action)
+        # print("action1: ",self.action)
 
         self.action = np.clip(self.action, self.real_action_lower, self.real_action_upper)
         # print("action2: ",self.action)
@@ -245,15 +246,15 @@ class LasvsimEnv(gym.Env):
             ),
             metadata=self.metadata
         )
-        print("dynamic : ",dynamic_info)
+        # print("dynamic : ",dynamic_info)
         self.update_state()
         self.update_ref_points(flag)
         self.update_neighbor_state()
         # print("self u: ",self._state[2])
         info = {**self.info}
         reward, rew_info = self.reward_function_multilane()
-        print("reward function multi: ",reward)
-        print("reward function multi info : ",rew_info)
+        # print("reward function multi: ",reward)
+        # print("reward function multi info : ",rew_info)
         # self._buffered_reward = (reward, rew_info)
         # print("reward 2: ",reward)
         # print("reward2 info : ",rew_info)
@@ -489,7 +490,8 @@ class LasvsimEnv(gym.Env):
             f"vx, vy, phi: {self._state[2]:.2f}, {self._state[3]:.2f}, {self._state[4]:.2f}",
             f"pos: {self._state[0]:.2f}, {self._state[1]:.2f}",
             # f"reward: {reward}"
-            ] + [f"{key}: {val:.2f}" for key, val in self._render_info.items()]
+            ] + [f"{key}: {val:.2f}" for key, val in self._render_info.items()] + \
+        [f"{key}:{val};" for key, val in self._done_info_rec.items()]
         height = 1/len(text_strs)
         text_locs = [(0.2, 1-height*i) for i, _ in enumerate(text_strs)]
         text_objs = []
@@ -979,6 +981,7 @@ class LasvsimEnv(gym.Env):
         # TODO: implement this, get constraint from self.stub
         return np.random.uniform(low=-1, high=1, size=(1,))
 
+    _done_info_rec = {}
     def judge_done(self) -> bool:
     
         collision_info = self.stub.GetVehicleCollisionInfo(
@@ -998,7 +1001,15 @@ class LasvsimEnv(gym.Env):
         ego_pos = pos.position_dict.get(self.ego_id).position_type
 
         done =  (ego_pos == 1)
-        if self.out_of_range or (self._ego[3] == 0.):
+        park_flag = self._ego[3] == 0.
+        tracking_out_of_region = self.out_of_range
+        self._done_info_rec = {
+            "Pause": park_flag,
+            "RegionOut": tracking_out_of_region,
+            "Collision": collision_flag,
+            "MapOut": done
+        }
+        if tracking_out_of_region or park_flag:
             done = True
         return done
     

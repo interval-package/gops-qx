@@ -91,3 +91,7 @@ python example_train/fhadp/fhadp2_attention_idsim_crossroad_offsync.py
 # TODO:
 1. 在idsim(qianxing)千行环境中做evaluation，复现国建哥在idsim(sumo)中的评估结果
 2. 将SEPT接入环境
+
+## 如何更新千行token
+
+在主目录下，创建`qx.token`文件，然后将token放入 其中

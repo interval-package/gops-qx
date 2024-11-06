@@ -110,7 +110,7 @@ qianxing_config = {
     'b_surr': True,
     "render_flag": False,
     "render_info": {
-        "draw_bound": 30,
+        "draw_bound": 300,
         "show_npc": True,
         "type": ".png",
         "dpi": 300
