@@ -22,11 +22,14 @@ class InferenceHelperPolicyDSAC(nn.Module):
         real_act = action * self.act_scale_factor + self.bias
         return real_act
 
-def load_pkl_to_onnx(pkl_file, output_onnx_file, input_dim, act_scale_factor, obs_scale_factor, bias, obs_config):
-    # Load the saved model from a .pkl file
-    with open(pkl_file, 'rb') as f:
-        model = pickle.load(f)
-    
+def onnx_dsac(pkl_file:str, output_onnx_file, input_dim, act_scale_factor, obs_scale_factor, bias, obs_config):
+    if isinstance(pkl_file, str):
+        # Load the saved model from a .pkl file
+        with open(pkl_file, 'rb') as f:
+            model = torch.load(f, map_location="cpu")
+    else:
+        model = pkl_file    
+        
     # Wrap the model with the inference helper class
     onnx_model = InferenceHelperPolicyDSAC(model, act_scale_factor, obs_scale_factor, bias, obs_config)
     
@@ -57,7 +60,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load and export model
-    load_pkl_to_onnx(
+    onnx_dsac(
         args.pkl_file,
         args.output_onnx_file,
         args.input_dim,

@@ -95,12 +95,16 @@ app = Flask(__name__)
 @app.route('/info/mdlversion', methods=['GET'])
 def get_model_version():
     """Get the model version file."""
-    return get_info_file(FILE_MDLVERSION)
+    with open(os.path.join(DIR_INFO, FILE_MDLVERSION), "rt") as f:
+        version = f.read()
+    return jsonify({'version': version}), 200
 
 @app.route('/info/trajversion', methods=['GET'])
 def get_traj_version():
     """Get the trajectory version file."""
-    return get_info_file(FILE_TRAJVERSION)
+    with open(os.path.join(DIR_INFO, FILE_TRAJVERSION), "rt") as f:
+        version = f.read()
+    return jsonify({'version': version}), 200
 
 def get_info_file(file_name):
     """Helper function to send info files."""
@@ -109,20 +113,20 @@ def get_info_file(file_name):
     except FileNotFoundError:
         return jsonify({'error': f'{file_name} not found'}), 404
 
-def list_csv_files(directory):
+def list_files(directory, attr=".csv"):
     """List all CSV files in the specified directory."""
-    return [file for file in os.listdir(directory) if file.endswith('.csv')]
+    return [file for file in os.listdir(directory) if file.endswith(attr)]
 
 @app.route('/info/mdllist', methods=['GET'])
 def get_model_list():
     """Get the list of model version files (CSV) available."""
-    model_files = list_csv_files(DIR_MODELS)
+    model_files = list_files(DIR_MODELS, ".onnx")
     return jsonify({'model_files': model_files}), 200
 
 @app.route('/info/trajlist', methods=['GET'])
 def get_traj_list():
     """Get the list of trajectory version files (CSV) available."""
-    traj_files = list_csv_files(DIR_TRAJS)
+    traj_files = list_files(DIR_TRAJS)
     return jsonify({'traj_files': traj_files}), 200
 
 """
@@ -189,7 +193,7 @@ def upload_file(type):
                     raise ValueError(f"Invalid format for {filename}")
                 upload_dir = DIR_TRAJS
                 version = filename[0:-4]
-                write_info(FILE_MDLVERSION, version)
+                write_info(FILE_TRAJVERSION, version)
             else:
                 raise ValueError(f"Invalid type for {type}")
         except Exception as e:
@@ -207,4 +211,4 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", default=5000, type=int, help="Server listen port")
     args = parser.parse_args()
-    app.run(debug=False, port=2790)
+    app.run(debug=False, host="0.0.0.0", port=80)
