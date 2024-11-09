@@ -2,6 +2,7 @@ import importlib
 import contextlib
 import os, sys
 import json
+from time import sleep
 import requests
 import argparse
 import torch
@@ -9,6 +10,8 @@ import onnxruntime as ort
 from gops.utils.OTA.onnx.dsac import onnx_dsac
 from typing import Tuple
 import subprocess
+from tqdm import tqdm
+
 
 from gops.utils.OTA.onnx.pkl2onnx_dsact import \
     DSAC_policy_export_onnx_model, onnx_brute_force, _load_args
@@ -97,12 +100,50 @@ class OTA_asyncor:
             print(f"Fail to upload, report: {upload_info}")
         return
 
-    def async_traj(self, version:str=None, idx:int=None):
+    def check_update(self):
+        msg = "None"
+        local_trajs = self.util_get_file_list(self.traj_dir, ".csv")
+        success, trajs = self.list_trajs()
+        if not success:
+            return False, None, f"Fail to fetch, {trajs}"
+        else:
+            trajs = trajs["traj_files"]
+        trajs_idc = [i for i in trajs if i.startswith("idc")]
+        local_idc = [i for i in local_trajs if i.startswith("idc")]
+        trajs_idc.sort()
+        local_idc.sort()
+        to_update = False
+        # check the current version is the latest or not
+        if not trajs_idc:
+            msg = f"Fail to fetch, no traj on server."
+        elif not local_idc:
+            to_update = True
+            trajname = trajs_idc[-1][:-4]
+            msg = "local empty"
+        else:
+            trajname = trajs_idc[-1][:-4]
+            r_time = "-".join(self.util_parse_idc_filename(trajs_idc[-1])[-2:])
+            l_time = "-".join(self.util_parse_idc_filename(local_idc[-1])[-2:])
+            to_update = r_time > l_time
+            msg = "local checking"
+        return to_update, trajname, msg
+
+    def async_traj(self, trajname=None):
         """
         traj named after mdlversion(x.x.x).x.csv
         """
-        local_traj_list = self.util_get_file_list(self.traj_dir, ".csv")
-        return
+        if trajname is None:
+            to_update, trajname, check = self.check_update()
+        else:
+            to_update, check = True, "Given target"
+
+        if to_update:
+            print(f"To update by {check}")
+            success, msg = self.download_traj(trajname)
+            print(msg)
+        else:
+            print(f"Not updated by {check}")
+        return to_update, trajname
 
     def local_get_opt_mdl(self):
         local_mdl_list = self.util_get_file_list(self.model_dir, ".pkl")
@@ -173,7 +214,7 @@ class OTA_asyncor:
     def download_traj(self, version: str) -> Tuple[bool, str]:
         """
         Downloads the specified trajectory version from the server.
-        Saves it in the trajectory directory.
+        Saves it in the trajectory directory with a progress bar.
         """
         url = f"{self.base_url}/download/traj/{version}"
         traj_save_path = os.path.join(self.traj_dir, f"{version}.csv")
@@ -181,8 +222,13 @@ class OTA_asyncor:
         try:
             response = requests.get(url, stream=True)
             if response.status_code == 200:
-                with open(traj_save_path, 'wb') as f:
-                    f.write(response.content)
+                total_size = int(response.headers.get('content-length', 0))
+                with open(traj_save_path, 'wb') as f, tqdm(
+                    total=total_size, unit='B', unit_scale=True, desc=f"Downloading {version}"
+                ) as progress_bar:
+                    for data in response.iter_content(chunk_size=1024):
+                        f.write(data)
+                        progress_bar.update(len(data))
                 return True, f"Trajectory version {version} downloaded successfully."
             else:
                 return False, f"Failed to download trajectory: {response.text}"
@@ -246,6 +292,14 @@ class OTA_asyncor:
             return False, str(e)
 
     @staticmethod
+    def util_parse_idc_filename(filename):
+        comps = filename[:-4].split("_")
+        cfg = comps[-1]
+        date = comps[2]
+        time = comps[3]
+        return cfg, date, time
+
+    @staticmethod
     def util_get_file_list(folder_path, extension="pkl"):
         return [f for f in os.listdir(folder_path) if f.endswith(extension)]
 
@@ -283,19 +337,35 @@ def OTA_parser():
     assert os.path.exists(args.ckpt_dir), "No such info saved."
     return args
 
+ckpt_dir = "/home/idlaber24/code/gops-qx/results/pyth_idsim/DSACTPI_241106-155249"
+args_debug = {
+    "host": "59.110.149.45",
+    "port": 80,
+    "ckpt_dir": ckpt_dir,
+}
+
 def main():
     # args = OTA_parser()
     # ckpt = args.ckpt
-    ckpt_dir = "results/pyth_idsim/DSACTPI_241013-023014"
-    args_debug = {
-        "host": "localhost",
-        "port": 2790,
-        "ckpt_dir": ckpt_dir,
-    }
+
     obj = OTA_asyncor(**args_debug)
-    obj.async_mdl(version="1.0.1")
+    obj.async_mdl(version="2.0.7")
+    trajs = obj.list_trajs()
+    print(trajs)
+    # obj.async_traj()
     return
 
+def main_updating():
+    obj = OTA_asyncor(**args_debug)
+    version = 1
+    version_str = "2.1."
+    while True:
+        update, msg = obj.async_traj()
+        if update:
+            sleep(600)
+            obj.async_mdl(f"{version_str}{version}")
+            version += 1
+        sleep(10)
 
 if __name__== '__main__':
     main()
