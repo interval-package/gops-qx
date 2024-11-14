@@ -346,16 +346,22 @@ if __name__ == "__main__":
 
     # update_train(10)
 
-    version = 1
-    version_str = "3.1."
+    def increase_version(version:str, pos=2):
+        comps = version.split(".")
+        comps[pos] = str(int(comps[pos])+1)
+        return ".".join(comps)
+
+    success, version = ota.get_model_version()
+    version = version["version"]
+    print(f"current version: {version}")
     try:
         while True:
             update, trajname = ota.async_traj()
             
             if update:
                 update_train()
-                ota.async_mdl(f"{version_str}{version}")
-                version += 1
+                version_str = increase_version(version)
+                ota.async_mdl(version_str)
                 time.sleep(1)
             else:
                 ota.log_info()
