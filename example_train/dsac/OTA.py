@@ -24,13 +24,10 @@ from gops.create_pkg.create_evaluator import create_evaluator
 from gops.create_pkg.create_sampler import create_sampler
 from gops.create_pkg.create_trainer import create_trainer
 from gops.utils.init_args import init_args
+
 from gops.env.env_gen_ocp.resources.idsim_model.params import qianxing_config
-from gops.utils.idsim.parser import parse_idsim_args
 import time
 os.environ['RAY_memory_monitor_refresh_ms'] = "0"  # disable memory monitor
-
-max_iter = 1000000
-
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
@@ -41,6 +38,57 @@ if __name__ == "__main__":
     # parser.add_argument("--vector_env_type", type=str, default="sync")
     # parser.add_argument("--scenario_id_list", nargs='+', type=str, default=scenario_list)
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
+    parser.add_argument("--env_scenario", type=str, default="multilane", help="crossroad / multilane")
+    parser.add_argument("--num_threads_main", type=int, default=4, help="Number of threads in main process")
+    env_scenario = parser.parse_known_args()[0].env_scenario
+
+    if env_scenario == "multilane_bc":
+        # ======crossroad config===========
+        from gops.env.env_gen_ocp.resources.idsim_config_multilane_bc import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
+    elif env_scenario == "multilane":
+        # ======multilane config===========
+        from gops.env.env_gen_ocp.resources.idsim_config_multilane import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
+    elif env_scenario == "crossroad":
+        # ======multilane config===========
+        from gops.env.env_gen_ocp.resources.idsim_config_crossroad import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
+    else:
+        raise NotImplementedError(f"The env_scenario {env_scenario} not inplemented.")
+
+    base_env_config = get_idsim_env_config(env_scenario)
+    base_env_model_config = get_idsim_model_config(env_scenario)
+    parser.add_argument("--extra_env_config", type=str, default=r'{}')
+    parser.add_argument("--extra_env_model_config", type=str, default=r'{}')
+    extra_env_config = parser.parse_known_args()[0].extra_env_config
+    print(extra_env_config )
+    extra_env_config = json.loads(extra_env_config)
+    extra_env_model_config = parser.parse_known_args()[0].extra_env_model_config
+    extra_env_model_config = json.loads(extra_env_model_config)
+    base_env_config.update(extra_env_config)
+    base_env_model_config.update(extra_env_model_config)
+    parser.add_argument("--env_config", type=dict, default=base_env_config)
+    parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
+    parser.add_argument("--scenerios_list", type=list, default=[':19','19:'])
+
+    parser.add_argument("--vector_env_num", type=int, default=4, help="Number of vector envs")
+    parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
+    parser.add_argument("--gym2gymnasium", type=bool, default=True, help="Convert Gym-style env to Gymnasium-style")
+
+    parser.add_argument("--ego_scale", type=list, default=[1, 20, 20, 1, 4, 1, 4] ) #  vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
+    parser.add_argument("--sur_scale", type=list, default=[0.2, 1, 1, 10, 1, 1, 1, 1] ) #  rel_x, rel_y , cos(phi), sin(phi), speed, length, width, mask
+    parser.add_argument("--ref_scale", type=list, default=[0.2, 1, 1, 10, 1] ) # ref_x ref_y ref_cos(ref_phi) ref_sin(ref_phi), error_v
+    ego_scale = parser.parse_known_args()[0].ego_scale
+    sur_scale = parser.parse_known_args()[0].sur_scale
+    ref_scale = parser.parse_known_args()[0].ref_scale
+    obs_scale = cal_idsim_obs_scale(
+        ego_scale=ego_scale,
+        sur_scale=sur_scale,
+        ref_scale=ref_scale,
+        env_config=base_env_config,
+        env_model_config=base_env_model_config
+    )
+    parser.add_argument("--obs_scale", type=dict, default=obs_scale)
+    parser.add_argument("--repeat_num", type=int, default=4, help="action repeat num")
+
     parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=1, help="seed")
@@ -54,7 +102,8 @@ if __name__ == "__main__":
     parser.add_argument("--is_constrained", type=bool, default=False, help="Adversary training")
     # 1.1 Parameters for qianxing
     # using `qianxingp_` + `value`
-    parse_idsim_args(parser)
+    parser.add_argument("--qianxingp_task_id", type=int, default=101, help="Qianxing task id")
+    parser.add_argument("--qianxingp_token", type=int, default=None, help="Qianxing task id")
 
     ################################################
     # 2.1 Parameters of value approximate function
@@ -81,7 +130,7 @@ if __name__ == "__main__":
         help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy",
     )
     parser.add_argument(
-        "--policy_func_type", type=str, default="MLP", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS"
+        "--policy_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS"
     )
     parser.add_argument(
         "--policy_act_distribution",
@@ -97,6 +146,58 @@ if __name__ == "__main__":
     parser.add_argument("--policy_min_log_std", type=int, default=-20)
     parser.add_argument("--policy_max_log_std", type=int, default=0.5)
 
+    # 2.3 Parameters of shared approximate function
+    pi_paras = cal_idsim_pi_paras(env_config=base_env_config, env_model_config=base_env_model_config)
+    parser.add_argument("--target_PI", type=bool, default=True)
+    parser.add_argument("--enable_self_attention", type=bool, default=False)
+    parser.add_argument("--pi_begin", type=int, default=pi_paras["pi_begin"])
+    parser.add_argument("--pi_end", type=int, default=pi_paras["pi_end"])
+    parser.add_argument("--enable_mask", type=bool, default=True)
+    parser.add_argument("--obj_dim", type=int, default=pi_paras["obj_dim"])
+    parser.add_argument("--attn_dim", type=int, default=64)
+    parser.add_argument("--pi_out_dim", type=int, default=pi_paras["output_dim"])
+    parser.add_argument("--pi_hidden_sizes", type=list, default=[256,256,256])
+    parser.add_argument("--pi_hidden_activation", type=str, default="gelu")
+    parser.add_argument("--pi_output_activation", type=str, default="linear")
+    parser.add_argument("--freeze_pi_net", type=str, default="critic")
+    parser.add_argument("--encoding_others", type=bool, default=False)
+    parser.add_argument("--others_hidden_sizes", type=list, default=[64,64])
+    parser.add_argument("--others_hidden_activation", type=str, default="gelu")
+    parser.add_argument("--others_output_activation", type=str, default="linear")
+    parser.add_argument("--others_out_dim", type=int, default=32)
+    max_iter = 1000000
+    parser.add_argument("--policy_scheduler", type=json.loads, default={
+        "name": "CosineAnnealingLR",
+        "params": {
+                "T_max": max_iter,
+            }
+    })
+
+    parser.add_argument("--q1_scheduler", type=json.loads, default={
+        "name": "CosineAnnealingLR",
+        "params": {
+                "T_max": max_iter,
+            }
+    })
+    parser.add_argument("--q2_scheduler", type=json.loads, default={
+        "name": "CosineAnnealingLR",
+        "params": {
+                "T_max": max_iter,
+            }
+    })
+    parser.add_argument("--pi_scheduler", type=json.loads, default={
+        "name": "CosineAnnealingLR",
+        "params": {
+                "T_max": max_iter,
+            }
+    })
+
+    parser.add_argument("--alpha_scheduler", type=json.loads, default={
+        "name": "CosineAnnealingLR",
+        "params": {
+                "T_max": max_iter,
+            }
+    })
     ################################################
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
@@ -150,7 +251,7 @@ if __name__ == "__main__":
     trainer_type = parser.parse_known_args()[0].trainer
     # 4.1. Parameters for off_serial_trainer
     parser.add_argument(
-        "--buffer_name", type=str, default="prioritized_stratified_replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
+        "--buffer_name", type=str, default="replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
     )
     parser.add_argument(
         "--category_num", type=int, default=6, help="Number of categories for stratified replay buffer")
@@ -199,42 +300,66 @@ if __name__ == "__main__":
         "takeover_bias_phi": (0.0, 0.02),
     }
 
-    time00 = time.time()
-    # Get parameter dictionary
+    from gops.utils.OTA.traj.utils import parse_csv_to_trajectory
+    from gops.utils.OTA.OTA_asyncor import OTA_asyncor
+    from gops.trainer.buffer.replay_buffer import ReplayBuffer
+
+
+    ckpt_dir = "/home/idlaber24/code/gops-qx/results/pyth_idsim/DSACTPI_241106-155249"
+    args_ota = {
+        "host": "59.110.149.45",
+        "port": 80,
+        "ckpt_dir": ckpt_dir,
+    }
+
     args = vars(parser.parse_args())
     args["eval_env_config"] = eval_env_config
+    args["save_folder"] = ckpt_dir
 
     # qianxing config
     qianxing_config["task_id"] = args["qianxingp_task_id"]
     
     # port_dict
     env = create_env(**{**args, "vector_env_num": None})
-    # env = create_env(**args)
-
     args = init_args(env, **args)
-    # env.close()
-
-    # start_tensorboarsd(args["save_folder"])
-    # Step 1: create algorithm and approximate function
     alg = create_alg(**args)
-    # Step 2: create sampler in trainer
-    sampler = create_sampler(env_options=None, **args)
-    # Step 3: create buffer in trainer
-    buffer = create_buffer(**args)
-    # Step 4: create evaluator in trainer
-    eval_args = deepcopy(args)
-    eval_args["env_config"].update(eval_env_config)
-    eval_args["repeat_num"] = None  
-    evaluator = create_evaluator(**eval_args)
-    # Step 5: create trainer
-    trainer = create_trainer(alg, sampler, buffer, evaluator, **args)
+    buffer = ReplayBuffer(**args)
+    ota = OTA_asyncor(**args_ota)
+    args["ini_network_dir"] = None
+    from gops.trainer.off_serial_OTA_trainer import OffSerialOTATrainer
+    trainer = OffSerialOTATrainer(alg, buffer, ota, **args)
 
-    ################################################
-    # Start training ... ...
-    trainer.train()
-    print("Training is finished!")
-    print("finish time: ",time.time()-time00)
+    b_szie = args["replay_batch_size"]
 
-    ################################################
-    # Plot and save training figures
-    print("Plot & Save are finished!")
+    def update_train(replay_times=100):
+        # clear buffer
+        buffer.ptr = 0
+        file_path = "/home/idlaber24/code/gops-qx/idc_controler_2024-8-21_13-56-8_default.csv" # ota.local_get_traj()
+        print(f"Loading traj from {file_path}")
+        exps = parse_csv_to_trajectory(file_path)
+        exe_times = int(len(exps) / b_szie) * replay_times
+        print(f"Update training start, sample leb:{len(exps)}, replay_times: {replay_times}")
+        trainer.offline_sample(exps)
+        trainer.step_tranverse(exe_times)
+        print("Save latest model...")
+        return
+
+    # update_train(10)
+
+    version = 1
+    version_str = "3.1."
+    try:
+        while True:
+            update, trajname = ota.async_traj()
+            
+            if update:
+                update_train()
+                ota.async_mdl(f"{version_str}{version}")
+                version += 1
+                time.sleep(1)
+            else:
+                ota.log_info()
+                time.sleep(10)
+    except KeyboardInterrupt as e:
+        exit(0)
+

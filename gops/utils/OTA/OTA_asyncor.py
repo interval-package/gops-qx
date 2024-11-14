@@ -8,10 +8,10 @@ import argparse
 import torch
 import onnxruntime as ort
 from gops.utils.OTA.onnx.dsac import onnx_dsac
+from gops.utils.OTA.traj.utils import parse_csv_to_trajectory
 from typing import Tuple
 import subprocess
 from tqdm import tqdm
-
 
 from gops.utils.OTA.onnx.pkl2onnx_dsact import \
     DSAC_policy_export_onnx_model, onnx_brute_force, _load_args
@@ -42,6 +42,22 @@ class OTA_asyncor:
         self.host = host
         self.port = port
         self.base_url = f"http://{host}:{port}"
+
+    def log_info(self, padding=16):
+        _, ver_mdl = self.get_model_version()
+        success, ver_traj =  self.get_traj_version()
+        print("#" * padding + " log info " + "#" * padding)
+        if success and _:
+            print(f"model version: {ver_mdl['version']}, traj version: {ver_traj['version']}")
+        success, trajs = self.list_trajs()
+        if success:
+            trajs:list = trajs["traj_files"]
+            trajs.sort()
+            print("Trajs:")
+            for traj in trajs[-3:]:
+                print(f"-\t{traj}")
+        print("#" * padding + " ota info " + "#" * padding)
+        return
 
     def parse_model_config(self):
         args = self.config
@@ -100,35 +116,55 @@ class OTA_asyncor:
             print(f"Fail to upload, report: {upload_info}")
         return
 
-    def check_update(self):
+    def check_update(self, mode="ver"):
         msg = "None"
+        trajname = None
         local_trajs = self.util_get_file_list(self.traj_dir, ".csv")
         success, trajs = self.list_trajs()
         if not success:
             return False, None, f"Fail to fetch, {trajs}"
         else:
             trajs = trajs["traj_files"]
-        trajs_idc = [i for i in trajs if i.startswith("idc")]
-        local_idc = [i for i in local_trajs if i.startswith("idc")]
-        trajs_idc.sort()
-        local_idc.sort()
-        to_update = False
-        # check the current version is the latest or not
-        if not trajs_idc:
-            msg = f"Fail to fetch, no traj on server."
-        elif not local_idc:
-            to_update = True
-            trajname = trajs_idc[-1][:-4]
-            msg = "local empty"
-        else:
-            trajname = trajs_idc[-1][:-4]
-            r_time = "-".join(self.util_parse_idc_filename(trajs_idc[-1])[-2:])
-            l_time = "-".join(self.util_parse_idc_filename(local_idc[-1])[-2:])
-            to_update = r_time > l_time
-            msg = "local checking"
+        if mode == "idc":
+            trajs_idc = [i for i in trajs if i.startswith("idc")]
+            local_idc = [i for i in local_trajs if i.startswith("idc")]
+            trajs_idc.sort()
+            local_idc.sort()
+            to_update = False
+            # check the current version is the latest or not
+            if not trajs_idc:
+                msg = f"Fail to fetch, no traj on server."
+            elif not local_idc:
+                to_update = True
+                trajname = trajs_idc[-1][:-4]
+                msg = "local empty"
+            else:
+                trajname = trajs_idc[-1][:-4]
+                r_time = "-".join(self.util_parse_idc_filename(trajs_idc[-1])[-2:])
+                l_time = "-".join(self.util_parse_idc_filename(local_idc[-1])[-2:])
+                to_update = r_time > l_time
+                msg = "local checking"
+        elif mode == "ver":
+            trajs_idc = [i for i in trajs if not i.startswith("idc")]
+            local_idc = [i for i in local_trajs if not i.startswith("idc")]
+            trajs_idc.sort()
+            local_idc.sort()
+            to_update = False
+            # check the current version is the latest or not
+            if not trajs_idc:
+                msg = f"Fail to fetch, no traj on server."
+            elif not local_idc:
+                to_update = True
+                trajname = trajs_idc[-1][:-4]
+                msg = "local empty"
+            else:
+                trajname = trajs_idc[-1][:-4]
+                local_name = local_idc[-1][:-4]
+                to_update = trajname > local_name
+                msg = "local checking"
         return to_update, trajname, msg
 
-    def async_traj(self, trajname=None):
+    def async_traj(self, trajname=None, verbose=False):
         """
         traj named after mdlversion(x.x.x).x.csv
         """
@@ -149,6 +185,10 @@ class OTA_asyncor:
         local_mdl_list = self.util_get_file_list(self.model_dir, ".pkl")
         miter, optiter = self.util_get_opt(local_mdl_list, self.util_parse_apprname)
         return os.path.join(self.model_dir, f"apprfunc_{miter if optiter < 0 else f'{optiter}_opt'}.pkl")
+
+    def local_get_traj(self):
+        local_traj_list = self.util_get_file_list(self.traj_dir, ".csv")
+        return os.path.join(self.traj_dir, local_traj_list[-1])
 
     ## Comunicate
 
@@ -243,7 +283,7 @@ class OTA_asyncor:
         try:
             response = requests.get(url)
             if response.status_code == 200:
-                return True, response.text
+                return True, response.json()
             else:
                 return False, f"Failed to retrieve model version: {response.text}"
         except Exception as e:
@@ -257,7 +297,7 @@ class OTA_asyncor:
         try:
             response = requests.get(url)
             if response.status_code == 200:
-                return True, response.text
+                return True, response.json()
             else:
                 return False, f"Failed to retrieve trajectory version: {response.text}"
         except Exception as e:

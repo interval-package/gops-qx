@@ -12,6 +12,7 @@ from gops.env.env_gen_ocp.resources.idsim_model.multilane.context import MultiLa
 from gops.env.env_gen_ocp.resources.idsim_model.model_context import Parameter, BaseContext, State as ModelState
 from gops.env.env_gen_ocp.resources.idsim_model.observe.ref import compute_onref_mask
 from gops.env.env_gen_ocp.pyth_idsim import get_idsimcontext, idSimEnv, CloudServer, IdSimModel, LasvsimEnv
+from gops.trainer.sampler.base import Experience
 
 one_array = Union[list, np.ndarray]
 
@@ -95,6 +96,7 @@ class Traj:
     ego_state: one_array
     ref_state: one_array
     sur_state: one_array
+    sur_info: one_array
     last_last_action: one_array
     last_action: one_array
     action: one_array
@@ -104,31 +106,42 @@ class Traj:
     onref_mask: one_array
     
     @classmethod
-    def parse_from_list(cls, data:list, l_act:list, ll_act:list, env:idSimEnv, **kwargs):
+    def parse_from_list(cls, data:list, l_act:list, ll_act:list, env:idSimEnv = None, **kwargs):
+        num_sur = 5
+        downsample_h = 10
         _ego = dict(zip(info_ego, data[s_ego: s_ego+l_ego]))
-        ego_state = [_ego[i] for i in comp_ego_state]
-        ref_state = data[s_ref:s_ref+n_ref*cl_ref]
-        sur_state = data[s_sur:s_sur+n_sur*(l_sur*(cl_sur)+cl_sur_h)]
+        ego_state = np.array([_ego[i] for i in comp_ego_state]).astype(np.float32)
+        ref_state = np.array([data[s_ref+i*cl_ref : \
+                                   s_ref+i*cl_ref + cl_ref] \
+                              for i in range(10)]).astype(np.float32)
+        sur_state = np.array([data[s_sur+i*(cl_sur*l_sur + cl_sur_h) + cl_sur_h : \
+                                   s_sur+i*(cl_sur*l_sur + cl_sur_h) + cl_sur_h + cl_sur] \
+                              for i in range(num_sur)]).astype(np.float32)
+        sur_info = np.array([data[s_sur+i*(cl_sur*l_sur + cl_sur_h) + 1 : \
+                                   s_sur+i*(cl_sur*l_sur + cl_sur_h) + 1 + 2] \
+                              for i in range(num_sur)]).astype(np.float32)
         last_last_action = ll_act
         last_action = l_act
         action = [_ego[i] for i in comp_action]
         action_real = [_ego[i] for i in comp_real_action]
-        cur_state = State(ego_state + l_act + l_act, ContextState(ref_state, sur_state, 0))
-        context = get_idsimcontext(
-                    cur_state, 
-                    mode="batch", 
-                    scenario=env.scenario
-                )
-        nominal_acc = env.server.model._get_nominal_acc_by_state
-        nominal_steer = env.server.model._get_nominal_acc_by_state
-        onref_mask = compute_onref_mask(BaseContext(context))
-        return cls(ego_state, ref_state, sur_state, 
+        # cur_state = State(ego_state + l_act + l_act, ContextState(ref_state, sur_state, 0))
+        # context = get_idsimcontext(
+        #             cur_state, 
+        #             mode="batch", 
+        #             scenario=env.scenario
+        #         )
+        # nominal_acc = env.server.model._get_nominal_acc_by_state
+        # nominal_steer = env.server.model._get_nominal_acc_by_state
+        # onref_mask = compute_onref_mask(BaseContext(context))
+        nominal_acc = None
+        nominal_steer = None
+        onref_mask = None
+        return cls(ego_state, ref_state, sur_state, sur_info,
                    last_last_action, last_action, action, 
                    action_real, nominal_acc, nominal_steer, 
                    onref_mask)
 
     def get_reward(self, env:LasvsimEnv):
-
         context = get_idsimcontext(
             State.stack([env._state]), 
             mode="batch", 
@@ -140,29 +153,36 @@ class Traj:
         return model_free_reward
 
     def get_ego_obs(self):
-        return self.ego_state[[2,3,5]].reshape(-1)
+        return np.concatenate([self.ego_state[[2,3,5]].reshape(-1), self.last_last_action, self.last_action], axis=-1)
 
     def get_ref_obs(self):
         ref_info = self.ref_state.reshape((-1,cl_ref))
         ego_info = self.ego_state.reshape((1,-1))
+        coord_info = coordinate_transformation(
+                    ego_info[:, 0], ego_info[:, 1], ego_info[:, 4], ref_info[:, 0], ref_info[:, 1], ref_info[:, 2]
+                ).reshape((-1,3))
         ref_obs = np.concatenate(
             (
-                coordinate_transformation(
-                    ego_info[:, 0], ego_info[:, 1], ego_info[:, 4], ref_info[:, 0], ref_info[:, 1], ref_info[:, 2]
-                ), 
-                ref_info[:, 3].reshape(-1, 1)
+                coord_info[:, :2], np.sin(coord_info[: ,2:]), np.cos(coord_info[: ,2:]), ref_info[:, 3:4]
             ), axis=1
         ).reshape(-1) 
         return ref_obs
 
     def get_sur_obs(self):
-        neighbor_info = self.sur_state.reshape(-1,(cl_sur))
+        neighbor_info = self.sur_state.reshape((-1, cl_sur))
+        neighbor_cfg = self.sur_info.reshape((-1, 2))
         ego_info = self.ego_state.reshape((1,-1))
         state_egotrans = coordinate_transformation(
-                    ego_info[:, 0], ego_info[:, 1], ego_info[:, 4], neighbor_info[:, 0], neighbor_info[:, 1], neighbor_info[:, 2]
+                    ego_info[:, 0], ego_info[:, 1], ego_info[:, 4], neighbor_info[:, 0], neighbor_info[:, 1], neighbor_info[:, 2], 
         )
+        dvx, dvy = neighbor_info[:, 3] - ego_info[:, 2], neighbor_info[:, 4] - ego_info[:, 3]
+        # dv = np.sqrt(np.square(dvx) + np.square(dvy))
+        # neighbor_obs = np.concatenate(
+        #     (state_egotrans[:, :2], np.cos(state_egotrans[:, 2:3]), np.sin(state_egotrans[:, 2:3]), neighbor_info[:, 3:]), axis=1
+        # ).reshape(-1)
+        dvx = dvx.reshape((-1,1))
         neighbor_obs = np.concatenate(
-            (state_egotrans[:, :2], np.cos(state_egotrans[:, 2:3]), np.sin(state_egotrans[:, 2:3]), neighbor_info[:, 3:]), axis=1
+            (state_egotrans[:, :2], np.cos(state_egotrans[:, 2:3]), np.sin(state_egotrans[:, 2:3]), dvx , neighbor_cfg[:,:2], np.ones_like(dvx)), axis=1
         ).reshape(-1)
         return neighbor_obs
     
@@ -176,8 +196,16 @@ class Traj:
     pass
 
 
+def get_exp(traj_p:Traj, traj_a:Traj):
+    obs = traj_p.get_obs()
+    action = traj_p.action
+    reward = 0
+    done = False
+    next_obs = traj_a.get_obs()
+    return Experience(obs, action, reward, done, {}, next_obs, {}, 0)
+
 def parse_csv_to_trajectory(file_path):
-    trajectories = {}
+    exps = [] 
     
     try:
         with open(file_path, mode='r', newline='') as file:
@@ -186,16 +214,19 @@ def parse_csv_to_trajectory(file_path):
             ncols = len(cols)
             sur_state = cols[s_sur:s_sur+n_sur*(l_sur*(cl_sur)+cl_sur_h)]
             ret =  parse_sur(sur_states=sur_state)
-            # for row in reader:
-            #     if not row or len(row) < ncols:
-            #         break
-
-            #     break
+            for i in range(5):
+                row = reader.__next__()
+            ptraj = Traj.parse_from_list(row, [0,0], [0,0])
+            for row in reader:
+                traj = Traj.parse_from_list(row, ptraj.action, ptraj.action)
+                exp = get_exp(ptraj, traj)
+                exps.append(exp)
+                ptraj = traj
 
     except (FileNotFoundError, IOError) as e:
         print(f"Error opening file: {e}")
     
-    return trajectories
+    return exps
 
 
 if __name__ == "__main__":

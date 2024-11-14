@@ -21,16 +21,12 @@ import numpy as np
 import gops.algorithm
 
 py_file_path = os.path.abspath(__file__)
-print(py_file_path)
 utils_path = os.path.dirname(py_file_path)
-print(utils_path)
 gops_path = os.path.dirname(utils_path)
 gops_path = os.path.join(gops_path, 'gops-grpc')
-print('gops_path', gops_path)
 # Add algorithm file to sys path
 alg_file = "gops/algorithm"
 alg_path = os.path.join(gops_path, alg_file)
-print(alg_path)
 sys.path.append(alg_path)
 
 

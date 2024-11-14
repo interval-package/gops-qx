@@ -58,7 +58,7 @@ class CloudServer:
     def init_idsim(self, env_config: Config, model_config: ModelConfig):
         env_config_dict = asdict(env_config)
         model_config_dict = asdict(model_config)
-        print(env_config_dict)
+        # print(env_config_dict)
         env_config = Config.from_partial_dict(env_config_dict)
         model_config = ModelConfig.from_partial_dict(model_config_dict)
         self.env = LasvsimEnv(**qianxing_config, env_config=env_config_dict,model_config=model_config_dict) ##TODO:add the vector_env list
