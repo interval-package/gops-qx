@@ -28,6 +28,9 @@ from gops.utils.init_args import init_args
 from gops.env.env_gen_ocp.resources.idsim_model.params import qianxing_config
 import time
 os.environ['RAY_memory_monitor_refresh_ms'] = "0"  # disable memory monitor
+
+CONFIG_BC = True
+
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
@@ -42,7 +45,8 @@ if __name__ == "__main__":
     parser.add_argument("--num_threads_main", type=int, default=4, help="Number of threads in main process")
     env_scenario = parser.parse_known_args()[0].env_scenario
 
-    if env_scenario == "multilane_bc":
+    # ======env config===========
+    if CONFIG_BC:
         # ======crossroad config===========
         from gops.env.env_gen_ocp.resources.idsim_config_multilane_bc import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
     elif env_scenario == "multilane":
@@ -53,13 +57,12 @@ if __name__ == "__main__":
         from gops.env.env_gen_ocp.resources.idsim_config_crossroad import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
     else:
         raise NotImplementedError(f"The env_scenario {env_scenario} not inplemented.")
-
+    
     base_env_config = get_idsim_env_config(env_scenario)
     base_env_model_config = get_idsim_model_config(env_scenario)
     parser.add_argument("--extra_env_config", type=str, default=r'{}')
     parser.add_argument("--extra_env_model_config", type=str, default=r'{}')
     extra_env_config = parser.parse_known_args()[0].extra_env_config
-    print(extra_env_config )
     extra_env_config = json.loads(extra_env_config)
     extra_env_model_config = parser.parse_known_args()[0].extra_env_model_config
     extra_env_model_config = json.loads(extra_env_model_config)
