@@ -103,10 +103,12 @@ if __name__ == "__main__":
     parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
     parser.add_argument("--is_adversary", type=bool, default=False, help="Adversary training")
     parser.add_argument("--is_constrained", type=bool, default=False, help="Adversary training")
+
     # 1.1 Parameters for qianxing
     # using `qianxingp_` + `value`
     parser.add_argument("--qianxingp_task_id", type=int, default=101, help="Qianxing task id")
-    parser.add_argument("--qianxingp_token", type=int, default=None, help="Qianxing task id")
+    # parser.add_argument("--qianxingp_token", type=int, default=None, help="Qianxing token")
+    parser.add_argument("--qianxingp_traj_flag", type=bool, default=True, help="Qianxing traj saver")
 
     ################################################
     # 2.1 Parameters of value approximate function
@@ -309,7 +311,9 @@ if __name__ == "__main__":
     args["eval_env_config"] = eval_env_config
 
     # qianxing config
-    qianxing_config["task_id"] = args["qianxingp_task_id"]
+    for key in [ke for ke in args.keys() if ke.startwith("qianxingp")]:
+        _qx_key = "_".join(key.split("_")[1:])
+        qianxing_config[_qx_key] = args[key]
     
     # port_dict
     env = create_env(**{**args, "vector_env_num": None})
