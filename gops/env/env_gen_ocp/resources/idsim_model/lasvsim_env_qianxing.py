@@ -492,13 +492,11 @@ class LasvsimEnv(gym.Env):
         pass
 
     def _render_update_info(self, mf_info, *, add_info={}):
-        if self.render_flag:
-            self._render_info = {}
-            for tag in self._render_tags:
-                if tag in mf_info.keys() and mf_info[tag] is not None:
-                    self._render_info[tag] = mf_info[tag]
-            self._render_info.update(add_info)
-        pass
+        self._render_info = {}
+        for tag in self._render_tags:
+            if tag in mf_info.keys() and mf_info[tag] is not None:
+                self._render_info[tag] = mf_info[tag]
+            # self._render_info.update(add_info)
     
     def _render_sur_byobs(self, neighbor_info=None, color = 'black', save_func=None,**kwargs):
         if self.traj_flag:

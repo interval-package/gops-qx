@@ -32,6 +32,7 @@ def main():
     shadow = deque([])
 
     for idx, context in enumerate(load_from_pickle_iterable(ckpt_traj)):
+        print(f"frame: {idx}")
         context.traj_flag = False
         context.render_flag = True
         context._render_cfg = cfg
