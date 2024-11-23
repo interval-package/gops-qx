@@ -1,6 +1,7 @@
 from collections import deque
 from dataclasses import dataclass
 import time
+from typing import Generator
 import matplotlib.pyplot as plt
 import os
 
@@ -70,6 +71,10 @@ class RenderCfg:
 
     def __getitem__(self, key):
         return self.render_config[key]
+    
+    def save(self):
+        with open(os.path.join(self.drawer_path_debug, "render_config.pkl"), "wb") as f:
+            pickle.dump(self, f)
 
 @dataclass
 class LasStateSurrogate:
@@ -100,3 +105,14 @@ def load_from_pickle_incremental(file_path):
             except EOFError:
                 break
     return data
+
+def load_from_pickle_iterable(file_path)->Generator[LasStateSurrogate, None, None]:
+    count = 0
+    with open(file_path, "rb") as f:
+        while True:
+            try:
+                yield pickle.load(f)  # Load one object at a time
+                count += 1
+            except EOFError:  # End of file
+                print(f"Loading finished with total {count} entries.")
+                break

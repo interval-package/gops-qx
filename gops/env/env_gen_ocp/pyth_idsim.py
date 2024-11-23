@@ -189,8 +189,8 @@ class idSimEnv(Env):
         # if not terminated:
         #     total_reward = np.maximum(total_reward, 0.05)
 
-        obs = self._get_obs(reward=reward, mf_reward=reward_model_free)
-        self.step_render()
+        obs = self._get_obs()
+        self.step_render(reward=reward, mf_reward=reward_model_free)
         # print("reward 1 ", reward_model_free)
         # print("reward 1 info:",mf_info)
         # print("reward total: ",total_reward)
@@ -199,8 +199,8 @@ class idSimEnv(Env):
 
     def step_render(self, reward=None, mf_reward=None):
         rw_info = {
-            "reward": reward,
-            "mf_reward": mf_reward
+            # "reward": reward,
+            # "mf_reward": mf_reward
         }
         self.server.env._render_update_info(self._info, add_info=rw_info)
         self.server.env._render_sur_byobs()

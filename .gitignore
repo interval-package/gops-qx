@@ -169,6 +169,7 @@ experiment
 
 # qianxing render
 /draw_qianxing/*
+/data_qx
 
 # localsim files
 localsim/*.log
@@ -177,3 +178,4 @@ localsim/*.pid
 
 # token
 qx.token
+example_run/draw.json

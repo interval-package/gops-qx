@@ -75,7 +75,6 @@ class LasvsimEnv(gym.Env):
         traj_flag: bool = False,
         **kwargs: Any,
     ):  
-        self.count = 0
         self.port = port
         self.config = env_config
         self.metadata = [('authorization', 'Bearer ' + token)]
@@ -411,6 +410,7 @@ class LasvsimEnv(gym.Env):
     ### Render utils
 
     #### Core params
+    _render_count = 0
     _render_tags = _render_tags
     _render_cfg: RenderCfg
     render_flag: bool
@@ -422,18 +422,24 @@ class LasvsimEnv(gym.Env):
     _render_done_info = {}
 
     def _render_init(self, render_info):
-        if render_info["path"] is None:
-            drawer_path_debug = f"./data_qx/{"draw" if self.render_flag else "data"}/{render_info['policy']}/" \
+        if not self.render_flag and not self.traj_flag:
+            print("Without pic and data saved")
+            return
+        else:
+            print("Into the data verbose mode")
+
+        if render_info.get("path", None) is None:
+            drawer_path_debug = f"./data_qx/{'draw' if self.render_flag else 'data'}/{render_info['policy']}/" \
                 + time.strftime("%m-%d-%H:%M:%S")
             os.makedirs(drawer_path_debug, exist_ok=True)
             # Warning should assert that it's shared
             render_info["path"] = drawer_path_debug
+
+        _map = Map()
+        _map.load_hd(self.map_dict[self.scenario_list[0]])
+
         if self.render_flag:
             f = plt.figure(figsize=(16,9))
-
-            _map = Map()
-            _map.load_hd(self.map_dict[self.scenario_list[0]])
-
             # draw totoal map
             # self.map.draw()
             # plt.cla()
@@ -450,6 +456,23 @@ class LasvsimEnv(gym.Env):
             "render_type": render_info["type"], # pic type
             "render_config": render_info,
         })
+        self._render_cfg.save()
+
+    def _render_parse_surcar(self, around_moving_objs):
+        ret = []
+
+        for neighbor in around_moving_objs:
+            row =\
+            [
+                neighbor.position.point.x,
+                neighbor.position.point.y,
+                neighbor.base_info.length,
+                neighbor.base_info.width,
+                neighbor.position.phi
+            ]
+            ret.append(row)
+
+        self._render_surcars = ret
 
     def _render_save_traj(self):
         obj = \
@@ -458,12 +481,12 @@ class LasvsimEnv(gym.Env):
             self._state,
             self._ref_points,
             self.action,
-            self._ego,
+            self._ego[:6].astype(np.float32),
             self._render_surcars,
             self._render_info,
             self._render_done_info,
             # Dynamic test
-            self._debug_dyn_state
+            self._debug_dyn_state.numpy()
         )
         append_to_pickle_incremental(os.path.join(self._render_cfg.drawer_path_debug, "trajs.pkl"), obj)
         pass
@@ -477,13 +500,11 @@ class LasvsimEnv(gym.Env):
             self._render_info.update(add_info)
         pass
     
-    def _render_sur_byobs(self, neighbor_info=None, color = 'black', **kwargs):
-        if not self.traj_flag:
+    def _render_sur_byobs(self, neighbor_info=None, color = 'black', save_func=None,**kwargs):
+        if self.traj_flag:
             self._render_save_traj()
         if not self.render_flag:
             return
-        if neighbor_info is None:
-            neighbor_info = self._neighbor_state
         
         original_nei = self._render_surcars
         
@@ -554,11 +575,7 @@ class LasvsimEnv(gym.Env):
 
         for index, neighbor in enumerate(original_nei):
             
-            center_x = neighbor.position.point.x
-            center_y = neighbor.position.point.y
-            length = neighbor.base_info.length
-            width = neighbor.base_info.width
-            phi = neighbor.position.phi
+            center_x, center_y, length, width, phi = neighbor
             
             if ego_x-self._render_cfg.draw_bound <= center_x and ego_x+self._render_cfg.draw_bound >= center_x and ego_y-self._render_cfg.draw_bound <= center_y and ego_y+self._render_cfg.draw_bound >= center_y:
                 car_rectangles.append(draw_car(center_x, center_y, length, width, phi, id=neighbor.obj_id))
@@ -569,9 +586,12 @@ class LasvsimEnv(gym.Env):
         car_rectangles.append(ego_car_t)
         
         # saving
-        self.count += 1 
-        f.savefig(os.path.join(f"{self._render_cfg.drawer_path_debug}", str(self.count) + self._render_cfg.render_type), dpi=self._render_cfg["dpi"])
-        
+        if save_func is None:
+            self._render_count += 1 
+            f.savefig(os.path.join(f"{self._render_cfg.drawer_path_debug}", str(self._render_count) + self._render_cfg.render_type), dpi=self._render_cfg["dpi"])
+        else:
+            save_func(f, ax)
+
         # Cleaning
         for text_obj in text_objs:
             text_obj.remove()
@@ -1169,8 +1189,7 @@ class LasvsimEnv(gym.Env):
         )
         around_moving_objs = perception_info.list
 
-        if self.render_flag:
-            self._render_surcars = around_moving_objs
+        self._render_parse_surcar(around_moving_objs)
 
         # print("perception res: ",around_moving_objs)
 
