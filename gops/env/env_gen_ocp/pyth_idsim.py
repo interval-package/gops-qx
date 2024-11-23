@@ -162,6 +162,7 @@ class idSimEnv(Env):
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         self._info = self._get_info(info)
         return self._get_obs(), self._info
+    
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         # print("sample dur", time.time() - time1)
         # ----- cal the next_obs, reward -----
@@ -183,20 +184,26 @@ class idSimEnv(Env):
         if truncated:
             info["TimeLimit.truncated"] = True # for gym
 
-        
         total_reward = reward_model_free + reward
         self._info = self._get_info(info, total_reward=total_reward)
         # if not terminated:
         #     total_reward = np.maximum(total_reward, 0.05)
 
-        obs = self._get_obs()
-        self.server.env.update_render_info(self._info)
-        self.server.env._render_sur_byobs()
+        obs = self._get_obs(reward=reward, mf_reward=reward_model_free)
+        self.step_render()
         # print("reward 1 ", reward_model_free)
         # print("reward 1 info:",mf_info)
         # print("reward total: ",total_reward)
         # print("step dur: ",time.time() - time1)
         return obs, total_reward, done, self._info
+
+    def step_render(self, reward=None, mf_reward=None):
+        rw_info = {
+            "reward": reward,
+            "mf_reward": mf_reward
+        }
+        self.server.env._render_update_info(self._info, add_info=rw_info)
+        self.server.env._render_sur_byobs()
 
     def set_ref_index(self, ref_index: int):
         self.ref_index = ref_index

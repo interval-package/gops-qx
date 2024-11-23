@@ -1,0 +1,102 @@
+from collections import deque
+from dataclasses import dataclass
+import time
+import matplotlib.pyplot as plt
+import os
+
+import numpy as np
+from gops.utils.map_tool.lib.map import Map
+import json
+
+_render_tags = [
+        'env_tracking_error', 
+        'env_speed_error', 
+        'env_delta_phi', 
+        # 'category', 
+        # 'env_pun2front', 
+        # 'env_pun2side', 
+        # 'env_pun2space', 
+        # 'env_pun2rear', 
+        'env_scaled_reward_part1', 
+        'env_reward_collision_risk', 
+        'env_scaled_pun2front', 
+        'env_scaled_pun2side', 
+        'env_scaled_pun2space', 
+        'env_scaled_pun2rear', 
+        'env_scaled_punish_boundary', 
+        # 'state', 
+        # 'constraint', 
+        # 'env_reward_step', 
+        # 'env_reward_steering', 
+        # 'env_reward_acc_long', 
+        # 'env_reward_delta_steer', 
+        # 'env_reward_jerk', 
+        # 'env_reward_dist_lat', 
+        # 'env_reward_vel_long', 
+        # 'env_reward_head_ang', 
+        # 'env_reward_yaw_rate', 
+        'env_scaled_reward_part2', 
+        'env_scaled_reward_step', 
+        'env_scaled_reward_dist_lat', 
+        'env_scaled_reward_vel_long', 
+        'env_scaled_reward_head_ang', 
+        'env_scaled_reward_yaw_rate', 
+        'env_scaled_reward_steering', 
+        'env_scaled_reward_acc_long', 
+        'env_scaled_reward_delta_steer', 
+        'env_scaled_reward_jerk', 
+        'total_reward',
+        # 'reward_details', 
+        # 'reward_comps'
+        ]
+
+@dataclass
+class RenderCfg:
+    draw_bound = 30
+    arrow_len = 1
+    # ego_shadows = deque([])
+    map = None
+    show_npc = False
+    drawer_path_debug:str = None
+    render_type = None
+    render_config:dict = None
+
+    def set_vals(self, **kwargs):
+        for key, val in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, val)
+            else:
+                print(f"No such var for {key}")
+
+    def __getitem__(self, key):
+        return self.render_config[key]
+
+@dataclass
+class LasStateSurrogate:
+    _state:             np.ndarray
+    _ref_points:        np.ndarray
+    action:             np.ndarray
+    _ego:               np.ndarray
+    _render_surcars:    list
+    _render_info:       dict
+    _render_done_info:  dict
+    # Debug vars
+    _debug_dyn_state:   np.ndarray = None
+
+import pickle
+
+# Append an individual data entry
+def append_to_pickle_incremental(file_path, data):
+    with open(file_path, "ab") as f:  # Append in binary mode
+        pickle.dump(data, f)
+
+# Load all individual entries
+def load_from_pickle_incremental(file_path):
+    data = []
+    with open(file_path, "rb") as f:
+        while True:
+            try:
+                data.append(pickle.load(f))  # Load one object at a time
+            except EOFError:
+                break
+    return data

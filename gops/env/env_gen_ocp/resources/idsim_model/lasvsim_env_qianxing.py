@@ -28,6 +28,11 @@ from collections import deque
 import os
 from gops.utils.map_tool.idc_maploader import MapBase
 from gops.utils.map_tool.lib.map import Map
+from gops.env.env_gen_ocp.resources.idsim_model.utils.las_render import \
+    RenderCfg, _render_tags, LasStateSurrogate, append_to_pickle_incremental
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+
 
 class LoggingInterceptor(grpc.UnaryUnaryClientInterceptor):
     def intercept_unary_unary(self, continuation, client_call_details, request):
@@ -61,14 +66,16 @@ class LasvsimEnv(gym.Env):
         b_surr: bool = True,
         env_config: Dict = {},
         model_config: Dict = {},
-        port: int = 8000,
-        render_flag: bool = False,
-        render_info: dict = {},
         task_id = None,
+        *,
+        port: int = 8000,
+        server_host = 'localhost:9001',
+        render_info: dict = {},
+        render_flag: bool = False,
+        traj_flag: bool = False,
         **kwargs: Any,
     ):  
         self.count = 0
-        self.drawer_path_debug = "/root/qianxing/gops-grpc/draw_qianxing/" + time.strftime("%m-%d-%H-%M")
         self.port = port
         self.config = env_config
         self.metadata = [('authorization', 'Bearer ' + token)]
@@ -78,14 +85,13 @@ class LasvsimEnv(gym.Env):
         self.lanes = dict()
         self.segments = dict()
         self.links = dict()
-        assert task_id is not None, "invalid task id"
-        print(f"task id: {task_id}\n", token)
-        self.sce_insecure_channel = grpc.insecure_channel('localhost:9001')
+        assert task_id is not None, "None task id"
+        
+        self.sce_insecure_channel = grpc.insecure_channel(server_host)
         self.sce_channel = grpc.intercept_channel(self.sce_insecure_channel.__enter__(),LoggingInterceptor())
         self.sce_stub = train_task_pb2_grpc.TrainTaskStub(self.sce_channel)
         # Note the task id wiil be overwrite in the qianxing_config at "gops/env/env_gen_ocp/resources/idsim_model/params.py"
         self.scenario_list = self.sce_stub.GetSceneIdList(train_task_pb2.GetSceneIdListRequest(task_id = task_id), metadata = self.metadata).scene_id_list
-        print("scenario", self.scenario_list)
 
         self.b_surr = b_surr
         self.timestamp = 0
@@ -95,7 +101,10 @@ class LasvsimEnv(gym.Env):
         self.stub = trainsim_pb2_grpc.SimulationStub(self.channel)
         self.scenario_stub = scenario_pb2_grpc.ScenarioStub(self.channel)
         self.scenario_cnt = 0
+
         self.render_flag = render_flag
+        self.traj_flag = traj_flag
+        
         try:
             self.startResp = self.stub.Init(
                 trainsim_pb2.InitReq(
@@ -186,25 +195,14 @@ class LasvsimEnv(gym.Env):
         self.seed()
         self.scenario_id = self.scenario_list[0]
         self.ref_index = 0
-        if self.render_flag:
-            f = plt.figure(figsize=(16,9))
-            self.drawer_path_debug = f"./draw_qianxing/{render_info['policy']}/" + time.strftime("%m-%d-%H:%M:%S")
-            render_info["path"] = self.drawer_path_debug
-            self.show_npc = render_info["show_npc"]
-            self.draw_bound = render_info["draw_bound"]
-            if not os.path.exists(self.drawer_path_debug):
-                os.makedirs(self.drawer_path_debug)
-            self.map = Map()
-            self.map.load_hd(self.map_dict[self.scenario_list[0]])
-            # self.map.draw()
-            # plt.cla()
-            
-            f.subplots_adjust(left=0.25)
-            self.map.draw_everything(show_id=False, show_link_boundary=False)
-            self.render_config = render_info
-        # self.max_step = env_config["max_steps"]
 
-    # _buffered_reward:tuple = (None, {})
+
+        self._render_init(render_info=render_info)
+
+        # Print Basic info
+        print(f"task id: {task_id}\n", token)
+        print("scenario", self.scenario_list)
+
   
     def step(self, action: np.ndarray,flag):
         self.step_counter += 1
@@ -216,12 +214,14 @@ class LasvsimEnv(gym.Env):
 
         self.action = np.clip(self.action, self.real_action_lower, self.real_action_upper)
         # print("action2: ",self.action)
+
+        # local dynamic rollout
         import torch
         from gops.env.env_gen_ocp.resources.idsim_model.model import ego_predict_model
         if self.step_counter == 1:
-            self.state_temp =  ego_predict_model(torch.from_numpy(self._state), torch.tensor([self.action[0], self.action[1]]), 0.1, (1800, 3058, 1.5756, 1.5756, -206369, -206369, 300, 0))
+            self._debug_dyn_state =  ego_predict_model(torch.from_numpy(self._state), torch.tensor([self.action[0], self.action[1]]), 0.1, (1800, 3058, 1.5756, 1.5756, -206369, -206369, 300, 0))
         else: 
-            self.state_temp =  ego_predict_model(self.state_temp, torch.tensor([self.action[0], self.action[1]]), 0.1, (1800, 3058, 1.5, 1.5, -206369, -206369, 300, 0))
+            self._debug_dyn_state =  ego_predict_model(self._debug_dyn_state, torch.tensor([self.action[0], self.action[1]]), 0.1, (1800, 3058, 1.5, 1.5, -206369, -206369, 300, 0))
             
         self.vehicleControleReult = self.stub.SetVehicleControlInfo(
             trainsim_pb2.SetVehicleControlInfoReq(
@@ -247,21 +247,24 @@ class LasvsimEnv(gym.Env):
             metadata=self.metadata
         )
         # print("dynamic : ",dynamic_info)
+
         self.update_state()
         self.update_ref_points(flag)
         self.update_neighbor_state()
+
         # print("self u: ",self._state[2])
-        info = {**self.info}
-        reward, rew_info = self.reward_function_multilane()
         # print("reward function multi: ",reward)
         # print("reward function multi info : ",rew_info)
         # self._buffered_reward = (reward, rew_info)
         # print("reward 2: ",reward)
         # print("reward2 info : ",rew_info)
-        info = {**rew_info,**self.info}
-        #print("step4: ",time.time()-time4)
+        # print("step4: ",time.time()-time4)
         # print("total time: ",time.time()-time0)
+
+        reward, rew_info = self.reward_function_multilane()
+        info = {**rew_info,**self.info}
         self.last_action  = self.action
+
         return self.get_obs(), reward, self.judge_done(), self.judge_done(),  info
 
     def stop(self):
@@ -356,7 +359,6 @@ class LasvsimEnv(gym.Env):
         self.veh_length = vehicles_baseInfo.info_dict.get(self.ego_id).base_info.length
         self.veh_width = vehicles_baseInfo.info_dict.get(self.ego_id).base_info.width
 
-
     def compute_phi(self, xt: float, xdt:float, yt: float, ydt:float) -> float:
         dx = xdt - xt
         dy = ydt - yt
@@ -405,80 +407,95 @@ class LasvsimEnv(gym.Env):
         obs = obs.astype(np.float32)
         return obs
 
+
+    ### Render utils
+
+    #### Core params
+    _render_tags = _render_tags
+    _render_cfg: RenderCfg
+    render_flag: bool
+
+    ####  data buffers    
     _render_info = {}
-    _render_tags = [
-        'env_tracking_error', 
-        'env_speed_error', 
-        'env_delta_phi', 
-        # 'category', 
-        # 'env_pun2front', 
-        # 'env_pun2side', 
-        # 'env_pun2space', 
-        # 'env_pun2rear', 
-        'env_scaled_reward_part1', 
-        'env_reward_collision_risk', 
-        'env_scaled_pun2front', 
-        'env_scaled_pun2side', 
-        'env_scaled_pun2space', 
-        'env_scaled_pun2rear', 
-        'env_scaled_punish_boundary', 
-        # 'state', 
-        # 'constraint', 
-        # 'env_reward_step', 
-        # 'env_reward_steering', 
-        # 'env_reward_acc_long', 
-        # 'env_reward_delta_steer', 
-        # 'env_reward_jerk', 
-        # 'env_reward_dist_lat', 
-        # 'env_reward_vel_long', 
-        # 'env_reward_head_ang', 
-        # 'env_reward_yaw_rate', 
-        'env_scaled_reward_part2', 
-        'env_scaled_reward_step', 
-        'env_scaled_reward_dist_lat', 
-        'env_scaled_reward_vel_long', 
-        'env_scaled_reward_head_ang', 
-        'env_scaled_reward_yaw_rate', 
-        'env_scaled_reward_steering', 
-        'env_scaled_reward_acc_long', 
-        'env_scaled_reward_delta_steer', 
-        'env_scaled_reward_jerk', 
-        'total_reward',
-        # 'reward_details', 
-        # 'reward_comps'
-        ]
-    
-    def update_render_info(self, mf_info):
+    _render_ego_shadows = deque([])
+    _render_surcars:list
+    _render_done_info = {}
+
+    def _render_init(self, render_info):
+        if render_info["path"] is None:
+            drawer_path_debug = f"./data_qx/{"draw" if self.render_flag else "data"}/{render_info['policy']}/" \
+                + time.strftime("%m-%d-%H:%M:%S")
+            os.makedirs(drawer_path_debug, exist_ok=True)
+            # Warning should assert that it's shared
+            render_info["path"] = drawer_path_debug
+        if self.render_flag:
+            f = plt.figure(figsize=(16,9))
+
+            _map = Map()
+            _map.load_hd(self.map_dict[self.scenario_list[0]])
+
+            # draw totoal map
+            # self.map.draw()
+            # plt.cla()
+            
+            f.subplots_adjust(left=0.25)
+            _map.draw_everything(show_id=False, show_link_boundary=False)
+
+        self._render_cfg = RenderCfg()
+        self._render_cfg.set_vals(**{
+            "drawer_path_debug": drawer_path_debug,
+            "show_npc": render_info["show_npc"],
+            "draw_bound": render_info["draw_bound"],
+            "map": _map,
+            "render_type": render_info["type"], # pic type
+            "render_config": render_info,
+        })
+
+    def _render_save_traj(self):
+        obj = \
+        LasStateSurrogate(
+            # Basic draw
+            self._state,
+            self._ref_points,
+            self.action,
+            self._ego,
+            self._render_surcars,
+            self._render_info,
+            self._render_done_info,
+            # Dynamic test
+            self._debug_dyn_state
+        )
+        append_to_pickle_incremental(os.path.join(self._render_cfg.drawer_path_debug, "trajs.pkl"), obj)
+        pass
+
+    def _render_update_info(self, mf_info, *, add_info={}):
         if self.render_flag:
             self._render_info = {}
             for tag in self._render_tags:
                 if tag in mf_info.keys() and mf_info[tag] is not None:
                     self._render_info[tag] = mf_info[tag]
+            self._render_info.update(add_info)
         pass
     
-    draw_bound = 30
-    arrow_len = 1
-    ego_shadows = deque([])
-    def _render_sur_byobs(self, neighbor_info=None, color = 'black'):
+    def _render_sur_byobs(self, neighbor_info=None, color = 'black', **kwargs):
+        if not self.traj_flag:
+            self._render_save_traj()
         if not self.render_flag:
             return
         if neighbor_info is None:
             neighbor_info = self._neighbor_state
-        import matplotlib.pyplot as plt
-        import matplotlib.patches as patches
-        import os
         
-        original_nei = self.cached_nei
+        original_nei = self._render_surcars
         
         f, ax = plt.gcf(), plt.gca()
         ego_x, ego_y = self._state[0], self._state[1]
         phi = self._state[4]
-        dx, dy = self.arrow_len*np.cos(phi), self.arrow_len*np.sin(phi)
+        dx, dy = self._render_cfg.arrow_len*np.cos(phi), self._render_cfg.arrow_len*np.sin(phi)
         arrow = plt.arrow(ego_x, ego_y, dx, dy, head_width=0.5)
-        plt.xlim(ego_x-self.draw_bound, ego_x+self.draw_bound)
-        plt.ylim(ego_y-self.draw_bound, ego_y+self.draw_bound)
+        plt.xlim(ego_x-self._render_cfg.draw_bound, ego_x+self._render_cfg.draw_bound)
+        plt.ylim(ego_y-self._render_cfg.draw_bound, ego_y+self._render_cfg.draw_bound)
         dot = plt.scatter(ego_x, ego_y, color='red', s=10)
-        self.ego_shadows.append((dot, arrow))
+        self._render_ego_shadows.append((dot, arrow))
         
         ref_x, ref_y = self._ref_points[:, 0], self._ref_points[:, 1]
         ref_lines = plt.plot(ref_x, ref_y, ls="dotted", color="red", linewidth=8)
@@ -492,7 +509,7 @@ class LasvsimEnv(gym.Env):
             f"pos: {self._state[0]:.2f}, {self._state[1]:.2f}",
             # f"reward: {reward}"
             ] + [f"{key}: {val:.2f}" for key, val in self._render_info.items()] + \
-        [f"{key}:{val};" for key, val in self._done_info_rec.items()]
+        [f"{key}:{val};" for key, val in self._render_done_info.items()]
         height = 1/len(text_strs)
         text_locs = [(0.2, 1-height*i) for i, _ in enumerate(text_strs)]
         text_objs = []
@@ -509,7 +526,6 @@ class LasvsimEnv(gym.Env):
             text_objs.append(text_obj)
         
         def draw_car(center_x, center_y, length, width, phi, facecolor="lightblue", id=None):
-            
             car = patches.Rectangle(
                 (center_x - length / 2, center_y - width / 2),  # Bottom-left corner of the rectangle
                 length,  # Width
@@ -520,22 +536,19 @@ class LasvsimEnv(gym.Env):
                 facecolor=facecolor,
                 alpha=0.5
             )
-            if self.show_npc:
+            text = None
+            if self._render_cfg.show_npc:
                 info = f"({center_x:.2f}, {center_y:.2f}): {phi:.2f}"
                 if id is not None:
                     info = f"{id}: " + info
                 text = ax.text(center_x, center_y, info, fontsize=13)
-            else:
-                text = None
             return car, text
 
-        
         def remove_car(car_t):
             car, text = car_t
             car.remove()
             if text is not None:
                 text.remove()
-            return
         
         car_rectangles = []
 
@@ -547,7 +560,7 @@ class LasvsimEnv(gym.Env):
             width = neighbor.base_info.width
             phi = neighbor.position.phi
             
-            if ego_x-self.draw_bound <= center_x and ego_x+self.draw_bound >= center_x and ego_y-self.draw_bound <= center_y and ego_y+self.draw_bound >= center_y:
+            if ego_x-self._render_cfg.draw_bound <= center_x and ego_x+self._render_cfg.draw_bound >= center_x and ego_y-self._render_cfg.draw_bound <= center_y and ego_y+self._render_cfg.draw_bound >= center_y:
                 car_rectangles.append(draw_car(center_x, center_y, length, width, phi, id=neighbor.obj_id))
                 plt.gca().add_patch(car_rectangles[-1][0])
             
@@ -555,8 +568,11 @@ class LasvsimEnv(gym.Env):
         plt.gca().add_patch(ego_car_t[0])
         car_rectangles.append(ego_car_t)
         
+        # saving
         self.count += 1 
-        f.savefig(os.path.join(f"{self.drawer_path_debug}", str(self.count) + self.render_config["type"]), dpi=self.render_config["dpi"])
+        f.savefig(os.path.join(f"{self._render_cfg.drawer_path_debug}", str(self.count) + self._render_cfg.render_type), dpi=self._render_cfg["dpi"])
+        
+        # Cleaning
         for text_obj in text_objs:
             text_obj.remove()
         for car in car_rectangles:
@@ -564,12 +580,13 @@ class LasvsimEnv(gym.Env):
         for line in ref_lines:
             line.remove()
             
-        if len(self.ego_shadows) > 30:
-            ego = self.ego_shadows.popleft()
+        if len(self._render_ego_shadows) > 30:
+            ego = self._render_ego_shadows.popleft()
             for i in ego:
                 i.remove()
-        pass
+        return
 
+    ### finish render
 
     def _get_nominal_steer_by_state(self, 
                                     ego_state,
@@ -982,7 +999,6 @@ class LasvsimEnv(gym.Env):
         # TODO: implement this, get constraint from self.stub
         return np.random.uniform(low=-1, high=1, size=(1,))
 
-    _done_info_rec = {}
     def judge_done(self) -> bool:
     
         collision_info = self.stub.GetVehicleCollisionInfo(
@@ -1004,7 +1020,7 @@ class LasvsimEnv(gym.Env):
         done =  (ego_pos == 1)
         park_flag = self._ego[3] == 0.
         tracking_out_of_region = self.out_of_range
-        self._done_info_rec = {
+        self._render_done_info = {
             "Pause": park_flag,
             "RegionOut": tracking_out_of_region,
             "Collision": collision_flag,
@@ -1095,45 +1111,6 @@ class LasvsimEnv(gym.Env):
     def _clac_ref_u(self, refpoints):
         return 10
         # TODO u should be a list, change this func reference.
-        ref_x, ref_y, ref_phi, ref_u = refpoints
-
-        # 获取路径点的数量
-        path_point_num = len(ref_u)
-
-        # 初始化减速开始的索引（如果未找到需要减速的点，则保持为路径点数量）
-        dec_start_index = path_point_num  
-        target_speed = ref_u[0]
-
-        # 寻找减速开始的点
-        for i in range(path_point_num):
-            if ref_u[i] < ref_u[0] - 1.0:
-                dec_start_index = i
-                target_speed = ref_u[i]
-                break
-
-        # 如果没有找到需要减速的点，则直接返回原始速度
-        if dec_start_index == path_point_num:
-            return ref_u
-        else:
-            # 设置减速参数
-            dec = 0.6
-            adv_dec_dist = 3 * target_speed
-
-            # 遍历路径点，计算减速
-            for i in range(dec_start_index - 1, -1, -1):
-                dist = np.sqrt((ref_x[i + 1] - ref_x[i]) ** 2 + (ref_y[i + 1] - ref_y[i]) ** 2)
-                if i == dec_start_index - 1:
-                    dist = 0.0
-                else:
-                    dist += np.sqrt((ref_x[i + 1] - ref_x[i]) ** 2 + (ref_y[i + 1] - ref_y[i]) ** 2)
-
-                if dist < adv_dec_dist:
-                    ref_u[i] = target_speed
-                else:
-                    v = np.sqrt(2 * dec * (dist - adv_dec_dist) + target_speed ** 2)
-                    ref_u[i] = min(ref_u[i], v)
-
-        return ref_u
 
     def update_ref_points_origin(self):
         '''
@@ -1191,8 +1168,10 @@ class LasvsimEnv(gym.Env):
             metadata=self.metadata
         )
         around_moving_objs = perception_info.list
+
         if self.render_flag:
-            self.cached_nei:list = around_moving_objs
+            self._render_surcars = around_moving_objs
+
         # print("perception res: ",around_moving_objs)
 
         # Preprocess the data of neighbor vehicles
@@ -1551,9 +1530,6 @@ class LasvsimEnv(gym.Env):
         Lb_x, Lb_y, _ = compute_waypoint(left_lane, Lb_position)
         left_center_distance = cal_distance(Lb_x, Lb_y, self._state[0],self._state[1])
         return left_center_distance,right_center_distance
-
-
-
 
 def env_creator(**kwargs: Any) -> LasvsimEnv:
     return LasvsimEnv(**kwargs)

@@ -32,7 +32,7 @@ from gops.env.env_gen_ocp.pyth_base import Env, State
 from gops.utils.plot_evaluation import cm2inch
 from gops.utils.common_utils import get_args_from_json, mp4togif
 from gops.utils.gops_path import gops_path
-
+from gops.env.env_gen_ocp.pyth_idsim import idSimEnv
 
 default_cfg = dict()
 default_cfg["fig_size"] = (12, 9)
@@ -167,7 +167,7 @@ class PolicyRunner:
 
     def run_an_episode(
         self,
-        env: Any,
+        env: idSimEnv,
         controller: Any,
         init_info: dict,
         is_opt: bool,
@@ -227,6 +227,7 @@ class PolicyRunner:
             print("ori action222:  ", action)
 
             next_obs, reward, done, info = env.step(action)
+            env.step_render()
 
             # save the real action (without scaling)
             action_list.append(info.get("raw_action", action))
@@ -242,8 +243,6 @@ class PolicyRunner:
                 info["TimeLimit.truncated"] = False
             # Draw environment animation
 
-            if render:
-                env.render()
         # env.stop()
         eval_dict = {
             "reward_list": reward_list,
