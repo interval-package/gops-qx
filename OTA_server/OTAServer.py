@@ -59,6 +59,7 @@ DIRS_DATA = [DIR_MODELS, DIR_TRAJS, DIR_UPLOAD, DIR_DOWNLOAD, DIR_INFO]
 
 FILE_MDLVERSION = "mdl_version.txt"
 FILE_TRAJVERSION = "traj_version.txt"
+FILE_TRAJDETAIL = "traj_detail.txt"
 FILES_INFO = [FILE_MDLVERSION, FILE_TRAJVERSION]
 
 def write_info(file, info):
@@ -79,6 +80,11 @@ def read_info(file) -> str:
 # Create directories if they do not exist
 for dir in DIRS_DATA:
     os.makedirs(dir, exist_ok=True)
+
+def increase_version(version:str, pos=2):
+    comps = version.split(".")
+    comps[pos] = str(int(comps[pos])+1)
+    return ".".join(comps)
 
 # Uncomment and implement version management as needed
 # for file in FILES_INFO:
@@ -127,7 +133,7 @@ def get_model_list():
 def get_traj_list():
     """Get the list of trajectory version files (CSV) available."""
     traj_files = list_files(DIR_TRAJS)
-    return jsonify({'traj_files': traj_files}), 200
+    return jsonify({'traj_files': [i for i in traj_files if is_valid_traj_filename(i)]}), 200
 
 """
 # Download endpoints
@@ -166,6 +172,13 @@ def is_valid_traj_filename(filename):
     traj_pattern = r'^\d+\.\d+\.\d+\.\d\.csv$'  # Format: x.x.x.x.csv
     return re.match(traj_pattern, filename) is not None
 
+def parse_traj_name_idc(filename:str):
+    comps = filename[:-4].split("_")
+    cfg = comps[-1]
+    date = comps[2]
+    time = comps[3]
+    return cfg, date, time
+
 @app.route('/upload/<type>', methods=['POST', 'PUT'])
 def upload_file(type):
     """Upload a model or trajectory file."""
@@ -189,11 +202,22 @@ def upload_file(type):
                 version = filename[0:-5]
                 write_info(FILE_MDLVERSION, version)
             elif type == "traj":
-                if not is_valid_traj_filename(filename):
-                    raise ValueError(f"Invalid format for {filename}")
                 upload_dir = DIR_TRAJS
-                version = filename[0:-4]
-                write_info(FILE_TRAJVERSION, version)
+                if is_valid_traj_filename(filename):
+                    version = filename[0:-4]
+                    write_info(FILE_TRAJVERSION, version)
+                    # info = f'{"date": {date}, "time": {time}}'
+                    # write_info(FILE_TRAJDETAIL, info)
+                    # raise ValueError(f"Invalid format for {filename}")
+                    pass
+                elif filename.startswith("idc"):
+                    cfg, date, _time = parse_traj_name_idc(filename=filename)
+                    version = read_info(FILE_TRAJVERSION)
+                    version = increase_version(version, 3)
+                    write_info(FILE_TRAJVERSION, version)
+                    filename = f"{version}.csv"
+                else:
+                    raise(ValueError("not valid file name"))
             else:
                 raise ValueError(f"Invalid type for {type}")
         except Exception as e:
@@ -209,6 +233,6 @@ def upload_file(type):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", default=5000, type=int, help="Server listen port")
+    parser.add_argument("--port", default=80, type=int, help="Server listen port")
     args = parser.parse_args()
-    app.run(debug=False, host="0.0.0.0", port=80)
+    app.run(debug=False, host="0.0.0.0", port=args.port)
