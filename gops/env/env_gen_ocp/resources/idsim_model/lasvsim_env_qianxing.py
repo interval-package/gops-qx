@@ -29,7 +29,7 @@ import os
 from gops.utils.map_tool.idc_maploader import MapBase
 from gops.utils.map_tool.lib.map import Map
 from gops.env.env_gen_ocp.resources.idsim_model.utils.las_render import \
-    RenderCfg, _render_tags, LasStateSurrogate, append_to_pickle_incremental
+    RenderCfg, _render_tags, LasStateSurrogate, append_to_pickle_incremental, render_tags_debug
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
@@ -412,6 +412,7 @@ class LasvsimEnv(gym.Env):
     #### Core params
     _render_count = 0
     _render_tags = _render_tags
+    _render_tags_debug = render_tags_debug
     _render_cfg: RenderCfg
     render_flag: bool
 
@@ -475,6 +476,7 @@ class LasvsimEnv(gym.Env):
         self._render_surcars = ret
 
     def _render_save_traj(self):
+        # filter save, make a triger to save vital cases.
         obj = \
         LasStateSurrogate(
             # Basic draw
@@ -486,7 +488,11 @@ class LasvsimEnv(gym.Env):
             self._render_info,
             self._render_done_info,
             # Dynamic test
-            self._debug_dyn_state.numpy()
+            self._debug_dyn_state.numpy(),
+            self._debug_done_errlat ,
+            self._debug_done_errlon ,
+            self._debug_done_errhead,
+            self._debug_done_postype,
         )
         append_to_pickle_incremental(os.path.join(self._render_cfg.drawer_path_debug, "trajs.pkl"), obj)
         pass
@@ -498,7 +504,7 @@ class LasvsimEnv(gym.Env):
                 self._render_info[tag] = mf_info[tag]
             # self._render_info.update(add_info)
     
-    def _render_sur_byobs(self, neighbor_info=None, color = 'black', save_func=None,**kwargs):
+    def _render_sur_byobs(self, neighbor_info=None, color = 'black', *, save_func=None, show_done=True, show_debug=False, **kwargs):
         if self.traj_flag:
             self._render_save_traj()
         if not self.render_flag:
@@ -527,8 +533,13 @@ class LasvsimEnv(gym.Env):
             f"vx, vy, phi: {self._state[2]:.2f}, {self._state[3]:.2f}, {self._state[4]:.2f}",
             f"pos: {self._state[0]:.2f}, {self._state[1]:.2f}",
             # f"reward: {reward}"
-            ] + [f"{key}: {val:.2f}" for key, val in self._render_info.items()] + \
-        [f"{key}:{val};" for key, val in self._render_done_info.items()]
+            ] + [f"{key}: {val:.2f}" for key, val in self._render_info.items()]
+        
+        if show_done:
+            text_strs += [f"{key}:{val};" for key, val in self._render_done_info.items()]
+        if show_debug:
+            text_strs += [f"{key}:{getattr(self, key)};" for key in self._render_tags_debug]
+
         height = 1/len(text_strs)
         text_locs = [(0.2, 1-height*i) for i, _ in enumerate(text_strs)]
         text_objs = []
@@ -843,6 +854,11 @@ class LasvsimEnv(gym.Env):
         tracking_error_lat = -math.sin(current_first_ref_phi) * (ego_x - current_first_ref_x) + math.cos(current_first_ref_phi) * (ego_y - current_first_ref_y)
         tracking_error_long = math.cos(current_first_ref_phi) * (ego_x - current_first_ref_x) + math.sin(current_first_ref_phi) * (ego_y - current_first_ref_y)
         self.out_of_range = (tracking_error_lat > 8) or (np.abs(delta_phi) > np.pi/4) or (ego_pos == 1) or (tracking_error_long > 2)
+        self._debug_done_errlat  = tracking_error_lat > 8
+        self._debug_done_errlon  = tracking_error_long > 2
+        self._debug_done_errhead = np.abs(delta_phi) > np.pi/4
+        self._debug_done_postype = ego_pos == 1
+        
         # self.out_of_range = tracking_error > 8 or np.abs(delta_phi) > np.pi/4 or ego_pos == 1
 
         # collision risk cost

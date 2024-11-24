@@ -179,3 +179,4 @@ localsim/*.pid
 # token
 qx.token
 example_run/draw.json
+example_run/recover.json

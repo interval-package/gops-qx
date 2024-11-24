@@ -51,6 +51,13 @@ _render_tags = [
         # 'reward_comps'
         ]
 
+render_tags_debug = [
+    "_debug_done_errlat",
+    "_debug_done_errlon",
+    "_debug_done_errhead",
+    "_debug_done_postype",
+]
+
 @dataclass
 class RenderCfg:
     draw_bound = 30
@@ -87,6 +94,10 @@ class LasStateSurrogate:
     _render_done_info:  dict
     # Debug vars
     _debug_dyn_state:   np.ndarray = None
+    _debug_done_errlat: np.ndarray = None
+    _debug_done_errlon: np.ndarray = None
+    _debug_done_errhead:np.ndarray = None
+    _debug_done_postype:np.ndarray = None
 
 import pickle
 
