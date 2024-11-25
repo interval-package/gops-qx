@@ -30,7 +30,9 @@ def main():
     cfg, ckpt_traj = init_args()
 
     # draw map
-    f = plt.figure(figsize=(16,9))
+    f = plt.figure(figsize=(16,9), dpi=40)
+    width, height = 16*40, 9*40
+
     f.subplots_adjust(left=0.25)
     cfg.map.draw_everything(show_id=False, show_link_boundary=False)
 
