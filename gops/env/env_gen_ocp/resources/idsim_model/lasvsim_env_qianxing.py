@@ -69,7 +69,7 @@ class LasvsimEnv(gym.Env):
         task_id = None,
         *,
         port: int = 8000,
-        server_host = 'localhost:9001',
+        server_host = 'localhost:8290',
         render_info: dict = {},
         render_flag: bool = False,
         traj_flag: bool = False,
@@ -95,7 +95,7 @@ class LasvsimEnv(gym.Env):
         self.b_surr = b_surr
         self.timestamp = 0
         self.action = np.array([0,0])
-        self.insecure_channel =  grpc.insecure_channel('localhost:9001')
+        self.insecure_channel =  grpc.insecure_channel(server_host)
         self.channel =  grpc.intercept_channel(self.insecure_channel.__enter__(),LoggingInterceptor())
         self.stub = trainsim_pb2_grpc.SimulationStub(self.channel)
         self.scenario_stub = scenario_pb2_grpc.ScenarioStub(self.channel)
@@ -238,13 +238,13 @@ class LasvsimEnv(gym.Env):
             ), 
             metadata=self.metadata
         )
-        dynamic_info = self.stub.GetVehicleDynamicParamsInfo(
-            trainsim_pb2.GetVehicleDynamicParamInfoReq(
-                simulation_id=self.startResp.simulation_id,
-                vehicle_id = self.ego_id,
-            ),
-            metadata=self.metadata
-        )
+        # dynamic_info = self.stub.GetVehicleDynamicParamsInfo(
+        #     trainsim_pb2.GetVehicleDynamicParamInfoReq(
+        #         simulation_id=self.startResp.simulation_id,
+        #         vehicle_id = self.ego_id,
+        #     ),
+        #     metadata=self.metadata
+        # )
         # print("dynamic : ",dynamic_info)
 
         self.update_state()
@@ -276,7 +276,6 @@ class LasvsimEnv(gym.Env):
         self.step_counter = 0
         assert expect_direction in ["left", "right", "straight", "uturn"]
         test_vehicle_list = []
-        print("scenario reset")
         if self.scenario_cnt <10:
             while len(test_vehicle_list) ==0:
                 self.resetResp = self.stub.Reset(
@@ -338,8 +337,6 @@ class LasvsimEnv(gym.Env):
         self.update_state()
         self.update_ref_points(True)
         self.update_neighbor_state()
-        print("reset u: ",self._state)
-
 
         return self.get_obs(), self.info
 
@@ -415,6 +412,7 @@ class LasvsimEnv(gym.Env):
     _render_tags_debug = render_tags_debug
     _render_cfg: RenderCfg
     render_flag: bool
+    traj_flag: bool
 
     ####  data buffers    
     _render_info = {}
@@ -427,17 +425,49 @@ class LasvsimEnv(gym.Env):
             print("Without pic and data saved")
             return
         else:
-            print("Into the data verbose mode")
-
-        if render_info.get("path", None) is None:
-            drawer_path_debug = f"./data_qx/{'draw' if self.render_flag else 'data'}/{render_info['policy']}/" \
-                + time.strftime("%m-%d-%H:%M:%S")
-            os.makedirs(drawer_path_debug, exist_ok=True)
-            # Warning should assert that it's shared
-            render_info["path"] = drawer_path_debug
+            print(f"Into the data verbose mode. render: {self.render_flag}, traj: {self.traj_flag}")
 
         _map = Map()
         _map.load_hd(self.map_dict[self.scenario_list[0]])
+
+        path_flag = render_info.get("_debug_path_qxdata", None)
+        if path_flag is None:
+            policy = render_info.get("policy", None)
+            if policy is not None:
+                _debug_path_qxdata = f"./data_qx/{'draw' if self.render_flag else 'data'}/{policy}/" \
+                    + time.strftime("%m-%d-%H:%M:%S")
+            else:
+                # In the training mode
+                _debug_path_qxdata = f"./data_qx/train/" \
+                    + time.strftime("%m-%d-%H:%M:%S")
+            
+            # The first time is init, the inited info is get by the path key
+            # Warning should assert that it's shared
+            render_info["_debug_path_qxdata"] = _debug_path_qxdata
+            os.makedirs(_debug_path_qxdata, exist_ok=True)
+
+            self._render_cfg = RenderCfg()
+            self._render_cfg.set_vals(**{
+                "_debug_path_qxdata": _debug_path_qxdata,
+                "show_npc": render_info["show_npc"],
+                "draw_bound": render_info["draw_bound"],
+                "map": _map,
+                "render_type": render_info["type"], # pic type
+                "render_config": render_info,
+            })
+            self._render_cfg.save()
+        else:
+            _debug_path_qxdata = path_flag
+            self._render_cfg = RenderCfg()
+            self._render_cfg.set_vals(**{
+                "_debug_path_qxdata": _debug_path_qxdata,
+                "show_npc": render_info["show_npc"],
+                "draw_bound": render_info["draw_bound"],
+                "map": _map,
+                "render_type": render_info["type"], # pic type
+                "render_config": render_info,
+            })
+            # self._render_cfg.save()
 
         if self.render_flag:
             f = plt.figure(figsize=(16,9))
@@ -447,17 +477,6 @@ class LasvsimEnv(gym.Env):
             
             f.subplots_adjust(left=0.25)
             _map.draw_everything(show_id=False, show_link_boundary=False)
-
-        self._render_cfg = RenderCfg()
-        self._render_cfg.set_vals(**{
-            "drawer_path_debug": drawer_path_debug,
-            "show_npc": render_info["show_npc"],
-            "draw_bound": render_info["draw_bound"],
-            "map": _map,
-            "render_type": render_info["type"], # pic type
-            "render_config": render_info,
-        })
-        self._render_cfg.save()
 
     def _render_parse_surcar(self, around_moving_objs):
         ret = []
@@ -476,6 +495,16 @@ class LasvsimEnv(gym.Env):
         self._render_surcars = ret
 
     def _render_save_traj(self):
+
+        _debug_adaptive_vars = {
+            # "_debug_dyn_state"    : self._debug_dyn_state.numpy(),
+            "_debug_done_errlat"  : self._debug_done_errlat ,
+            "_debug_done_errlon"  : self._debug_done_errlon ,
+            "_debug_done_errhead" : self._debug_done_errhead,
+            "_debug_done_postype" : self._debug_done_postype,
+            "_debug_reward_scaled_punish_boundary": self._debug_reward_scaled_punish_boundary,
+        }
+
         # filter save, make a triger to save vital cases.
         obj = \
         LasStateSurrogate(
@@ -487,14 +516,13 @@ class LasvsimEnv(gym.Env):
             self._render_surcars,
             self._render_info,
             self._render_done_info,
+            _debug_adaptive_vars,
+
             # Dynamic test
-            self._debug_dyn_state.numpy(),
-            self._debug_done_errlat ,
-            self._debug_done_errlon ,
-            self._debug_done_errhead,
-            self._debug_done_postype,
+            self._debug_dyn_state.numpy()
         )
-        append_to_pickle_incremental(os.path.join(self._render_cfg.drawer_path_debug, "trajs.pkl"), obj)
+        
+        append_to_pickle_incremental(os.path.join(self._render_cfg._debug_path_qxdata, "trajs.pkl"), obj)
         pass
 
     def _render_update_info(self, mf_info, *, add_info={}):
@@ -538,7 +566,7 @@ class LasvsimEnv(gym.Env):
         if show_done:
             text_strs += [f"{key}:{val};" for key, val in self._render_done_info.items()]
         if show_debug:
-            text_strs += [f"{key}:{getattr(self, key)};" for key in self._render_tags_debug]
+            text_strs += [f"{key}:{self[key]};" for key in self._render_tags_debug]
 
         height = 1/len(text_strs)
         text_locs = [(0.2, 1-height*i) for i, _ in enumerate(text_strs)]
@@ -597,7 +625,7 @@ class LasvsimEnv(gym.Env):
         # saving
         if save_func is None:
             self._render_count += 1 
-            f.savefig(os.path.join(f"{self._render_cfg.drawer_path_debug}", str(self._render_count) + self._render_cfg.render_type), dpi=self._render_cfg["dpi"])
+            f.savefig(os.path.join(f"{self._render_cfg._debug_path_qxdata}", str(self._render_count) + self._render_cfg.render_type), dpi=self._render_cfg["dpi"])
         else:
             save_func(f, ax)
 
@@ -983,7 +1011,7 @@ class LasvsimEnv(gym.Env):
                 punish_boundary = 1
 
         scaled_punish_boundary = punish_boundary * self.config['P_boundary']
-
+        self._debug_reward_scaled_punish_boundary = scaled_punish_boundary
         # action related reward
 
         reward = - scaled_punish_boundary

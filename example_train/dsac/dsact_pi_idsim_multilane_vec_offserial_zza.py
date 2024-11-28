@@ -2,6 +2,7 @@
 #  General Optimal control Problem Solver (GOPS)
 #  Intelligent Driving Lab(iDLab), Tsinghua University
 #
+
 #  Creator: iDLab
 #  Lab Leader: Prof. Shengbo Eben Li
 #  Email: lisb04@gmail.com
@@ -29,7 +30,7 @@ from gops.env.env_gen_ocp.resources.idsim_model.params import qianxing_config
 import time
 os.environ['RAY_memory_monitor_refresh_ms'] = "0"  # disable memory monitor
 
-CONFIG_BC = True
+CONFIG_BC = False
 
 if __name__ == "__main__":
     # Parameters Setup
@@ -37,9 +38,6 @@ if __name__ == "__main__":
 
     ################################################
     # Key Parameters for users
-    # parser.add_argument("--vector_env_num", type=int, default=len(scenario_list))
-    # parser.add_argument("--vector_env_type", type=str, default="sync")
-    # parser.add_argument("--scenario_id_list", nargs='+', type=str, default=scenario_list)
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
     parser.add_argument("--env_scenario", type=str, default="multilane", help="crossroad / multilane")
     parser.add_argument("--num_threads_main", type=int, default=4, help="Number of threads in main process")
@@ -72,7 +70,7 @@ if __name__ == "__main__":
     parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
     parser.add_argument("--scenerios_list", type=list, default=[':19','19:'])
 
-    parser.add_argument("--vector_env_num", type=int, default=4, help="Number of vector envs")
+    parser.add_argument("--vector_env_num", type=int, default=None, help="Number of vector envs")
     parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
     parser.add_argument("--gym2gymnasium", type=bool, default=True, help="Convert Gym-style env to Gymnasium-style")
 
@@ -106,7 +104,7 @@ if __name__ == "__main__":
 
     # 1.1 Parameters for qianxing
     # using `qianxingp_` + `value`
-    parser.add_argument("--qianxingp_task_id", type=int, default=101, help="Qianxing task id")
+    parser.add_argument("--qianxingp_task_id", type=int, default=102, help="Qianxing task id")
     # parser.add_argument("--qianxingp_token", type=int, default=None, help="Qianxing token")
     parser.add_argument("--qianxingp_traj_flag", type=bool, default=True, help="Qianxing traj saver")
 
@@ -244,7 +242,6 @@ if __name__ == "__main__":
             raise ValueError("The number of core is {}, but you want {}!".format(cpu_core_num, num_core_input))
         parser.add_argument("--alg_queue_max_size", type=int, default=1)
 
-
     # Maximum iteration number
     parser.add_argument("--max_iteration", type=int, default=max_iter)
     parser.add_argument(
@@ -311,16 +308,16 @@ if __name__ == "__main__":
     args["eval_env_config"] = eval_env_config
 
     # qianxing config
-    for key in [ke for ke in args.keys() if ke.startwith("qianxingp")]:
+    for key in [ke for ke in args.keys() if ke.startswith("qianxingp")]:
         _qx_key = "_".join(key.split("_")[1:])
         qianxing_config[_qx_key] = args[key]
     
-    # port_dict
     env = create_env(**{**args, "vector_env_num": None})
     # env = create_env(**args)
 
+    # The config is inited and the path specified, hence no more modification
+    args["qx_config"] = qianxing_config
     args = init_args(env, **args)
-    # env.close()
 
     # start_tensorboarsd(args["save_folder"])
     # Step 1: create algorithm and approximate function
@@ -329,6 +326,8 @@ if __name__ == "__main__":
     sampler = create_sampler(env_options=None, **args)
     # Step 3: create buffer in trainer
     buffer = create_buffer(**args)
+
+    # eval will not store data
     # Step 4: create evaluator in trainer
     eval_args = deepcopy(args)
     eval_args["env_config"].update(eval_env_config)

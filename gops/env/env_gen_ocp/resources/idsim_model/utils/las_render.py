@@ -56,6 +56,7 @@ render_tags_debug = [
     "_debug_done_errlon",
     "_debug_done_errhead",
     "_debug_done_postype",
+    "_debug_reward_scaled_punish_boundary",
 ]
 
 @dataclass
@@ -65,7 +66,7 @@ class RenderCfg:
     # ego_shadows = deque([])
     map = None
     show_npc = False
-    drawer_path_debug:str = None
+    _debug_path_qxdata:str = None
     render_type = None
     render_config:dict = None
 
@@ -80,7 +81,7 @@ class RenderCfg:
         return self.render_config[key]
     
     def save(self):
-        with open(os.path.join(self.drawer_path_debug, "render_config.pkl"), "wb") as f:
+        with open(os.path.join(self._debug_path_qxdata, "render_config.pkl"), "wb") as f:
             pickle.dump(self, f)
 
 @dataclass
@@ -92,12 +93,22 @@ class LasStateSurrogate:
     _render_surcars:    list
     _render_info:       dict
     _render_done_info:  dict
+
+    # adaptive vars
+    _debug_adaptive_vars: dict = None
+    
     # Debug vars
     _debug_dyn_state:   np.ndarray = None
-    _debug_done_errlat: np.ndarray = None
-    _debug_done_errlon: np.ndarray = None
-    _debug_done_errhead:np.ndarray = None
-    _debug_done_postype:np.ndarray = None
+    # _debug_done_errlat: np.ndarray = None
+    # _debug_done_errlon: np.ndarray = None
+    # _debug_done_errhead:np.ndarray = None
+    # _debug_done_postype:np.ndarray = None
+
+    def __getitem__(self, key):
+        if hasattr(self, key):
+            return getattr(self, key)
+        else:
+            return self._debug_adaptive_vars.get(key, "Unrecord")
 
 import pickle
 

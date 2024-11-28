@@ -854,17 +854,23 @@ class PolicyRunner:
                     print(key, value)
 
     @staticmethod
-    def __load_args(log_policy_dir: str):
+    def _load_args(log_policy_dir: str):
         json_path = os.path.join(log_policy_dir, "config.json")
         parser = argparse.ArgumentParser()
         args_dict = vars(parser.parse_args())
         args = get_args_from_json(json_path, args_dict)
         return args
 
+    @staticmethod
+    def _process_args(args:dict):
+        args['vector_env_num'] = None
+        args['gym2gymnasium'] = False
+        return args
+
     def __load_all_args(self):
         for i in range(self.policy_num):
             log_policy_dir = self.log_policy_dir_list[i]
-            args = self.__load_args(log_policy_dir)
+            args = self._load_args(log_policy_dir)
             args['vector_env_num'] = None
             args['gym2gymnasium'] = False
             self.args_list.append(args)
@@ -1049,14 +1055,20 @@ class PolicyRunner:
         self.__save_mp4_as_gif()
         self.draw()
 
-    def __single_run(self, pidx=0):
+    def single_run(self, pidx=0, *, env_args=None, plc_args=None, **kwargs):
         log_policy_dir = self.log_policy_dir_list[pidx]
         trained_policy_iteration = self.trained_policy_iteration_list[pidx]
 
         self.args = self.args_list[pidx]
         print("===========================================================")
         print("*** Begin to run policy {} ***".format(pidx + 1))
-        env = self.__load_env()
+        if env_args is not None:
+            args_bc = self.args
+            self.args = env_args
+            env = self.__load_env()
+            self.args = args_bc
+        else:
+            env = self.__load_env()
         if hasattr(env, "set_mode"):
             env.set_mode("test")
 
@@ -1065,7 +1077,14 @@ class PolicyRunner:
             print(self.__convert_format(env.train_space))
             print("Work space: ")
             print(self.__convert_format(env.work_space))
-        networks = self.__load_policy(log_policy_dir, trained_policy_iteration)
+
+        if plc_args is not None:
+            args_bc = self.args
+            self.args = plc_args
+            networks = self.__load_policy(log_policy_dir, trained_policy_iteration)
+            self.args = args_bc
+        else:
+            networks = self.__load_policy(log_policy_dir, trained_policy_iteration)
 
         # Run policy
         eval_dict, tracking_dict = self.run_an_episode(
@@ -1076,11 +1095,6 @@ class PolicyRunner:
         # mp4 to gif
         self.eval_list.append(eval_dict)
         self.tracking_list.append(tracking_dict)
-
-    def run_single(self, pidx=0):
-        self.__single_run(pidx)
-        # self.__save_mp4_as_gif()
-        # self.draw()
 
 
 def get_robot_state_from_info(info: dict) -> np.ndarray:

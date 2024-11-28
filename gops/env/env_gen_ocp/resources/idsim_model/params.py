@@ -109,7 +109,8 @@ qianxing_config = {
     'record_id': [1, 2, 3], ## simulation id list
     'b_surr': True,
     "render_flag": False,
-    "traj_flag": True,
+    "traj_flag": False,
+    "server_host" : 'localhost:8290',
     # this will be shared
     "render_info": {
         "draw_bound": 300,

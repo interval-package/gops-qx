@@ -12,6 +12,7 @@ import torch
 from gops.trainer.evaluator import Evaluator
 from gops.env.env_gen_ocp.resources.idsim_tags import idsim_tb_tags_dict
 
+from gops.env.env_gen_ocp.resources.idsim_model.params import qianxing_config
 
 class EvalResult:
     def __init__(self):
@@ -22,6 +23,8 @@ class EvalResult:
 
 class IdsimTrainEvaluator(Evaluator):
     def __init__(self, index=0, **kwargs):
+        qianxing_config["render_flag"] = False
+        qianxing_config["traj_flag"] = False
         super().__init__(index, **kwargs)
 
     def run_an_episode(self, iteration, render=False):
@@ -38,7 +41,6 @@ class IdsimTrainEvaluator(Evaluator):
         info["TimeLimit.truncated"] = False
         while not (done or info["TimeLimit.truncated"]):
             counter += 1 
-            print(f'----------counter----------{counter}')
             batch_obs = torch.from_numpy(np.expand_dims(obs, axis=0).astype("float32"))
             logits = self.networks.policy(batch_obs)
             action_distribution = self.networks.create_action_distributions(logits)

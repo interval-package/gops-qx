@@ -12,7 +12,7 @@ env_config_param_base = {
     "actuator": "ExternalActuator",
     "scenario_reuse": 4,
     "num_scenarios": 34,
-    "multilane_scenarios": tuple(range(0, 22)),
+    # "multilane_scenarios": tuple(range(0, 22)),
     "scenario_filter_surrounding_selector": '0,1,2,31,32,33',
     "detect_range": 60,
     "choose_vehicle_retries": 10,

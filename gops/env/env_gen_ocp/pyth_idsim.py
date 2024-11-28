@@ -55,13 +55,13 @@ class CloudServer:
     def __init__(self):
         self.idsim_id  = str
 
-    def init_idsim(self, env_config: Config, model_config: ModelConfig):
+    def init_idsim(self, env_config: Config, model_config: ModelConfig, qx_config:dict):
         env_config_dict = asdict(env_config)
         model_config_dict = asdict(model_config)
         # print(env_config_dict)
         env_config = Config.from_partial_dict(env_config_dict)
         model_config = ModelConfig.from_partial_dict(model_config_dict)
-        self.env = LasvsimEnv(**qianxing_config, env_config=env_config_dict,model_config=model_config_dict) ##TODO:add the vector_env list
+        self.env = LasvsimEnv(**qx_config, env_config=env_config_dict,model_config=model_config_dict) ##TODO:add the vector_env list
         self.model = IdSimModel(env_config, model_config)
 
     def reset_idsim(self, options: List[dict] = None):
@@ -111,12 +111,13 @@ class idSimEnv(Env):
     """
 
     def __init__(self, env_config: Config, model_config: ModelConfig, 
-                 scenario: str, env_idx: int=None, scenerios_list: List[str]=None):
+                 scenario: str, env_idx: int=None, scenerios_list: List[str]=None,
+                 qx_config=qianxing_config):
         self.env_idx = env_idx  
         print('env_idx:', env_idx)
         self.env_config = env_config
         self.server = CloudServer()
-        self.server.init_idsim(env_config, model_config)
+        self.server.init_idsim(env_config, model_config, qx_config)
         obs_dim = self.server.model.obs_dim
         self.model_config = model_config
         self.scenario = scenario
