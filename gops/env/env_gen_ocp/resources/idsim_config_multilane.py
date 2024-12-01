@@ -61,7 +61,7 @@ env_config_param_base = {
     # model free reward config
     "punish_sur_mode": "max",
     "enable_slow_reward": True,
-    "R_step": 2.0,
+    "R_step": 10.0,
     "P_lat": 5,
     "P_long": 8.0,
     "P_phi": 2.0,

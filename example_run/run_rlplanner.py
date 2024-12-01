@@ -25,7 +25,7 @@ if __name__ == "__main__":
     config_ref = args["qx_load"]
     args_ref = PolicyRunner._load_args(config_ref)
     args_ref = PolicyRunner._process_args(args_ref)
-
+    args_ref = None
     policies      = [args["rlplanner_load"]]
     models        = [args["rlplanner_ckpt"]]
     

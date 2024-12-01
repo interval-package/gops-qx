@@ -105,7 +105,7 @@ Most essential, need to caution
 
 qianxing_config = {
     'token':None,
-    'task_id': 81,
+    'task_id': None,
     'record_id': [1, 2, 3], ## simulation id list
     'b_surr': True,
     "render_flag": False,
@@ -113,6 +113,7 @@ qianxing_config = {
     "server_host" : 'localhost:8290',
     # this will be shared
     "render_info": {
+        "_debug_path_qxdata": None,
         "draw_bound": 300,
         "show_npc": True,
         "type": ".png",

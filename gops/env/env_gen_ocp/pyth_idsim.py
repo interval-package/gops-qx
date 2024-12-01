@@ -117,6 +117,8 @@ class idSimEnv(Env):
         print('env_idx:', env_idx)
         self.env_config = env_config
         self.server = CloudServer()
+        if qx_config is None:
+            qx_config=qianxing_config
         self.server.init_idsim(env_config, model_config, qx_config)
         obs_dim = self.server.model.obs_dim
         self.model_config = model_config

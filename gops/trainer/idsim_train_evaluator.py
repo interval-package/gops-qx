@@ -23,8 +23,6 @@ class EvalResult:
 
 class IdsimTrainEvaluator(Evaluator):
     def __init__(self, index=0, **kwargs):
-        qianxing_config["render_flag"] = False
-        qianxing_config["traj_flag"] = False
         super().__init__(index, **kwargs)
 
     def run_an_episode(self, iteration, render=False):

@@ -104,9 +104,10 @@ if __name__ == "__main__":
 
     # 1.1 Parameters for qianxing
     # using `qianxingp_` + `value`
-    parser.add_argument("--qianxingp_task_id", type=int, default=102, help="Qianxing task id")
+    parser.add_argument("--qianxingp_task_id", type=int, default=107, help="Qianxing task id")
     # parser.add_argument("--qianxingp_token", type=int, default=None, help="Qianxing token")
     parser.add_argument("--qianxingp_traj_flag", type=bool, default=True, help="Qianxing traj saver")
+    parser.add_argument("--qianxingp_render_flag", type=bool, default=True, help="Qianxing traj render")
 
     ################################################
     # 2.1 Parameters of value approximate function
@@ -117,7 +118,7 @@ if __name__ == "__main__":
         help="Options: StateValue/ActionValue/ActionValueDis/ActionValueDistri",
     )
     parser.add_argument("--value_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS")
-    parser.add_argument("--value_hidden_sizes", type=list, default=[256, 256,256])
+    parser.add_argument("--value_hidden_sizes", type=list, default=[256, 256, 256])
     parser.add_argument("--value_std_type", type=str, default='mlp_separated', help="Options: mlp_separated/mlp_shared")
     parser.add_argument(
         "--value_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
@@ -315,6 +316,8 @@ if __name__ == "__main__":
     env = create_env(**{**args, "vector_env_num": None})
     # env = create_env(**args)
 
+    qianxing_config["render_flag"] = False
+    qianxing_config["traj_flag"] = False
     # The config is inited and the path specified, hence no more modification
     args["qx_config"] = qianxing_config
     args = init_args(env, **args)

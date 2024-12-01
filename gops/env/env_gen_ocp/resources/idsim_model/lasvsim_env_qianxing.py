@@ -54,7 +54,7 @@ def timeit(func):
         value = func(*args, **kwargs)
         end_time = time.time()  # End the timer
         elapsed_time = end_time - start_time
-        print(f"Function {func.__name__!r} took {elapsed_time:.4f} seconds to complete.")
+        # print(f"Function {func.__name__!r} took {elapsed_time:.4f} seconds to complete.")
         return value
 
     return wrapper_timer
@@ -195,7 +195,7 @@ class LasvsimEnv(gym.Env):
         self.scenario_id = self.scenario_list[0]
         self.ref_index = 0
 
-
+        # _render_init函数；重构代码，在不需要 render 时节约计算资源
         self._render_init(render_info=render_info)
 
         # Print Basic info
@@ -881,7 +881,10 @@ class LasvsimEnv(gym.Env):
             
         tracking_error_lat = -math.sin(current_first_ref_phi) * (ego_x - current_first_ref_x) + math.cos(current_first_ref_phi) * (ego_y - current_first_ref_y)
         tracking_error_long = math.cos(current_first_ref_phi) * (ego_x - current_first_ref_x) + math.sin(current_first_ref_phi) * (ego_y - current_first_ref_y)
-        self.out_of_range = (tracking_error_lat > 8) or (np.abs(delta_phi) > np.pi/4) or (ego_pos == 1) or (tracking_error_long > 2)
+        self.out_of_range = (tracking_error_lat > 8) \
+                            or (np.abs(delta_phi) > np.pi/4) \
+                            or (tracking_error_long > 2) \
+                            # or (ego_pos == 1)
         self._debug_done_errlat  = tracking_error_lat > 8
         self._debug_done_errlon  = tracking_error_long > 2
         self._debug_done_errhead = np.abs(delta_phi) > np.pi/4
@@ -924,6 +927,9 @@ class LasvsimEnv(gym.Env):
         ego_lane = self._ego[7]
 
         for sur_vehicle in sur_info:
+            mask = sur_vehicle[-2]
+            if mask == 0:
+                continue
             sur_x = float(sur_vehicle[0])
             sur_y = float(sur_vehicle[1])
             sur_phi = float(sur_vehicle[2])

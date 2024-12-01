@@ -9,11 +9,29 @@ from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import Lasv
 from gops.env.env_gen_ocp.resources.idsim_model.utils.las_render import \
     LasStateSurrogate, RenderCfg, render_tags_debug,\
     load_from_pickle_iterable
+from gops.env.env_gen_ocp.resources.idsim_model.utils.vedio_utils.generate_gif import process_batch
 
+def _disp_done(surrogate: LasStateSurrogate):
+    print(surrogate._render_done_info)
+
+ref_ax, ref_ay = [], []
+
+def _disp_ref(surrogate: LasStateSurrogate, idx=None):
+    print('#'*50)
+    msg = f"iter: {idx}" if idx is not None else ""
+    print('ref point ')
+    for i in range(5):
+        ref_x, ref_y = surrogate._ref_points[i, :2].squeeze().tolist()
+        msg += f"[x: {ref_x:.2f}, y: {ref_y:.2f}]"
+        ref_ax.append(ref_x)
+        ref_ay.append(ref_y)
+    print(msg)
+
+_draw_debug_done = lambda surrogate: LasvsimEnv._render_sur_byobs(surrogate, show_debug=False, show_done=True)
 
 def init_args()->Tuple[RenderCfg,str]:
     parser = argparse.ArgumentParser()
-    parser.add_argument("ckpt", type=str, default="./example_run/recover.json")
+    parser.add_argument("--ckpt", type=str, default="./example_run/recover.json")
     args = parser.parse_args()
     ckpt:str = args.ckpt
     if ckpt.endswith(".json"):
@@ -24,10 +42,10 @@ def init_args()->Tuple[RenderCfg,str]:
     ckpt_traj = os.path.join(ckpt, "trajs.pkl")
     with open(ckpt_cfg, "rb") as f:
         cfg:RenderCfg = pickle.load(f)
-    return cfg, ckpt_traj
+    return cfg, ckpt_traj, ckpt
 
 def main():
-    cfg, ckpt_traj = init_args()
+    cfg, ckpt_traj, path = init_args()
 
     # draw map
     f = plt.figure(figsize=(16,9), dpi=40)
@@ -47,8 +65,15 @@ def main():
         context._render_count = idx-1
         context._render_ego_shadows = shadow
         # draw each moment
-        LasvsimEnv._render_sur_byobs(context, show_debug=True, show_done=False)
+        # LasvsimEnv._render_sur_byobs(context, show_debug=False, show_done=True)
+        # _disp_done(context)
+        # _draw_debug_done(context)
+        _disp_ref(context)
         pass
+
+    fname = f"res.mp4"
+    # process_batch(path, fname)
+    # create_video_from_images(path, os.path.join(path, fname))
 
     return 
 

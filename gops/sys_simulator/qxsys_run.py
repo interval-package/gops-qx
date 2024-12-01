@@ -227,7 +227,7 @@ class PolicyRunner:
             print("ori action222:  ", action)
 
             next_obs, reward, done, info = env.step(action)
-            env.step_render()
+            # env.step_render()
 
             # save the real action (without scaling)
             action_list.append(info.get("raw_action", action))
@@ -909,7 +909,8 @@ class PolicyRunner:
         log_path = log_policy_dir + "/apprfunc/apprfunc_{}.pkl".format(
             trained_policy_iteration
         )
-        networks.load_state_dict(torch.load(log_path))
+        state_dict = torch.load(log_path)
+        networks.load_state_dict(state_dict)
         return networks
 
     def __convert_format(self, origin_data_list: list):
@@ -1069,6 +1070,7 @@ class PolicyRunner:
             self.args = args_bc
         else:
             env = self.__load_env()
+            
         if hasattr(env, "set_mode"):
             env.set_mode("test")
 

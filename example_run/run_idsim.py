@@ -22,7 +22,7 @@ def parse_args():
 if __name__ == "__main__":
 
     args = parse_args()
-    qianxing_config["render_flag"] = False
+    qianxing_config["render_flag"] = True
     qianxing_config["traj_flag"] = True
 
     policy      = [args["load"]]
@@ -47,15 +47,22 @@ if __name__ == "__main__":
             "policy": policy_name,
             "draw_bound": 30,
             "show_npc": False,
+            "_debug_path_qxdata": None,
         }
 
         qianxing_config["render_info"].update(run_config)
         qianxing_config["task_id"] = runner.args_list[pidx]["qianxingp_task_id"]
 
+        # runner.args_list[pidx]["qx_config"].update(qianxing_config)
+        runner.args_list[pidx].update({
+            "max_steps": 50,
+            "qx_config": None
+        })
+
         runner.single_run(pidx)
 
-        if "path" in qianxing_config["render_info"].keys():
-            path = qianxing_config["render_info"]["path"]
+        if "_debug_path_qxdata" in qianxing_config["render_info"].keys():
+            path = qianxing_config["render_info"]["_debug_path_qxdata"]
             print(qianxing_config["render_info"])
             fname = f"mdl_{models[pidx]}.mp4"
             process_batch(path, fname)
