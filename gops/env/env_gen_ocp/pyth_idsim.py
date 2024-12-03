@@ -112,7 +112,7 @@ class idSimEnv(Env):
 
     def __init__(self, env_config: Config, model_config: ModelConfig, 
                  scenario: str, env_idx: int=None, scenerios_list: List[str]=None,
-                 qx_config=qianxing_config):
+                 qx_config=None):
         self.env_idx = env_idx  
         print('env_idx:', env_idx)
         self.env_config = env_config
@@ -389,6 +389,8 @@ def env_creator(**kwargs):
 
     env_idx = kwargs["env_idx"] if "env_idx" in kwargs.keys() else 0
 
+    qx_config = kwargs.get("qx_config", None)
+
     scenerios_list = kwargs["scenerios_list"] if "scenerios_list" in kwargs.keys() else None
-    env = idSimEnv(env_config, model_config, env_scenario, env_idx, scenerios_list)
+    env = idSimEnv(env_config, model_config, env_scenario, env_idx, scenerios_list, qx_config=qx_config)
     return env

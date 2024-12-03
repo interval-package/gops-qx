@@ -1143,7 +1143,6 @@ class LasvsimEnv(gym.Env):
         link_id = vehicles_position.position_dict.get(self.ego_id).link_id
         segment_id = vehicles_position.position_dict.get(self.ego_id).segment_id
         mask = 1
-        # print("ego state: ",self._state)
         self._ego = np.array([x, y, phi, u, length, width , segment_id, junction_id, lane_id, link_id ])
 
 
@@ -1164,7 +1163,7 @@ class LasvsimEnv(gym.Env):
             if (self.ref_index > len(ref_lines)-1) or len(ref_lines)==1:
                 self.ref_index = 0
             ref_line = np.array([[point.x, point.y, phi, u] for point in ref_lines[self.ref_index].points]).T
-            ref_path_discrete = path_discrete_t_new(ref_line, 0.1)
+            ref_path_discrete = path_discrete_t_new(ref_line, 0.1, self.ref_dim)
             ref_points = []
             for i in range(2*self.pre_horizon + 1):
                 ref_x = ref_path_discrete[0][i]

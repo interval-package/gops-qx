@@ -62,32 +62,25 @@ class IdSimModel:
         else:
             sur_obs = get_sur_obs(context, 1)
 
-        # print("ref_param shape5: ",context.p.ref_param)
-        # multi_ref_obs = get_ref_obs(context, self.model_config.num_ref_points, self.model_config.num_ref_lines)
         multi_ref_obs = get_ref_obs_frenet_coord(context, self.model_config.num_ref_points, self.model_config.num_ref_lines)
-        # print("multi_ref_obs: ",multi_ref_obs)
         ref_index = context.p.ref_index_param
         ref_obs = select_ref_by_index(multi_ref_obs, ref_index)
-        # print("ref_obs shape: ",ref_obs)
         downsample_ref_point_index = torch.tensor(self.model_config.downsample_ref_point_index)
-        # print("downsample index11: ",downsample_ref_point_index)
-        # print("downsample index22: ",self.model_config.num_ref_points)
-        # print("downsample index33: ",self.model_config.per_ref_feat_dim)
+
         downsample_index = torch.stack(
             [downsample_ref_point_index + i * self.model_config.num_ref_points
             for i in range(self.model_config.per_ref_feat_dim)]
         ).flatten()
-        # print("downsample index22: ",downsample_index)
 
         ref_obs = ref_obs[:, downsample_index]
-        # print("ref_obs shape2: ",ref_obs)
+
         # boundary
         if self.model_config.add_boundary_obs:
             bound_obs = context.p.boundary_param
-            obs = torch.cat((ego_obs, ref_obs, sur_obs,bound_obs), dim=-1)
+            obs = torch.cat((ego_obs, ref_obs, sur_obs, bound_obs), dim=-1)
         else:
             obs = torch.cat((ego_obs, ref_obs, sur_obs), dim=-1)
-        # print("obs shape: ",obs.shape)
+
         return obs
 
     def dynamics(self, context: BaseContext, action: torch.Tensor) -> State:

@@ -104,6 +104,8 @@ class PolicyRunner:
         obs_noise_data: list = None,
         action_noise_type: str = None,
         action_noise_data: list = None,
+        *,
+        rlplanner_flag = False
     ):
         self.log_policy_dir_list = [
             os.path.join(gops_path, d) for d in log_policy_dir_list
@@ -118,6 +120,8 @@ class PolicyRunner:
             self.init_info = {}
         self.legend_list = legend_list
         self.use_opt = use_opt
+
+        self.rlplanner_flag = rlplanner_flag
         if use_opt:
             assert load_opt_path is not None or opt_args is not None
             self.load_opt_path = load_opt_path
@@ -200,6 +204,8 @@ class PolicyRunner:
                     action = controller(obs, info)
             else:
                 action = self.compute_action(obs, controller)
+                if self.rlplanner_flag:
+                    action = action[... , :2]
                 action = self.__action_noise(action)
             if self.use_dist:
                 action = np.hstack((action, env.dist_func(step * env.tau)))

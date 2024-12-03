@@ -66,6 +66,8 @@ def get_apprfunc_dict(key: str, **kwargs):
     var["norm_matrix"] = kwargs.get("norm_matrix", None)
     var["pre_horizon"] = kwargs.get("pre_horizon", None)
     var["additional_info"] = kwargs.get("additional_info", None)
+    var["act_seq_len"] = kwargs.get("act_seq_len", 1)
+    var["act_seq_nn"] = kwargs.get("act_seq_nn", 1)
 
     apprfunc_type = kwargs[key + "_func_type"]
     if key + "_output_activation" not in kwargs.keys():
@@ -100,7 +102,6 @@ def get_apprfunc_dict(key: str, **kwargs):
         var["attn_out_dim"] = kwargs["attn_out_dim"]
         var["attn_begin"] = kwargs["attn_begin"]
         var["attn_end"] = kwargs["attn_end"]
-        var["attn_freeze"] = kwargs["attn_freeze"]
     elif apprfunc_type == "LipsNet":
         var["hidden_sizes"] = kwargs[key + "_hidden_sizes"]
         var["hidden_activation"] = kwargs[key + "_hidden_activation"]
@@ -123,6 +124,7 @@ def get_apprfunc_dict(key: str, **kwargs):
             var["pi_out_dim"] = kwargs["pi_out_dim"]
             var["encoding_others"] = kwargs["encoding_others"]
             var["enable_self_attention"] = kwargs["enable_self_attention"]
+            var["head_num"] = kwargs.get("head_num", None)
             var["attn_dim"] = kwargs.get("attn_dim", None)
             if var["encoding_others"]:
                 var["others_out_dim"] = kwargs["others_out_dim"]
@@ -140,6 +142,8 @@ def get_apprfunc_dict(key: str, **kwargs):
             var["hidden_sizes"] = kwargs[key + "_hidden_sizes"]
             var["hidden_activation"] = kwargs[key + "_hidden_activation"]
             var["output_activation"] = kwargs[key + "_output_activation"]
+            var["rnn_hidden_size"] = kwargs.get(key + "_rnn_hidden_size", None)
+            var["rnn_type"] = kwargs.get(key + "_rnn_type", None)
     else:
         raise NotImplementedError
 

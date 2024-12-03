@@ -72,7 +72,7 @@ def main():
         pass
 
     fname = f"res.mp4"
-    # process_batch(path, fname)
+    process_batch(path, fname)
     # create_video_from_images(path, os.path.join(path, fname))
 
     return 

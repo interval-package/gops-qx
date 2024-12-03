@@ -4,7 +4,7 @@ import os
 from gops.sys_simulator.qxsys_run import PolicyRunner
 from gops.env.env_gen_ocp.resources.idsim_model.params import qianxing_config
 from gops.env.env_gen_ocp.resources.idsim_model.utils.vedio_utils.generate_gif import process_batch
-from gops.env.env_gen_ocp.resources.idsim_model.utils.vedio_utils.generate_vedio import create_video_from_images
+from gops.env.env_gen_ocp.resources.idsim_model.utils.vedio_utils.generate_vedio import gen_video_cv2_mp4
 
 
 
@@ -25,7 +25,12 @@ if __name__ == "__main__":
     config_ref = args["qx_load"]
     args_ref = PolicyRunner._load_args(config_ref)
     args_ref = PolicyRunner._process_args(args_ref)
-    args_ref = None
+    # args_ref = None
+
+    config_rlp = args["rlplanner_load"]
+    args_rlp = PolicyRunner._load_args(config_rlp)
+    args_rlp = PolicyRunner._process_args(args_rlp)
+
     policies      = [args["rlplanner_load"]]
     models        = [args["rlplanner_ckpt"]]
     
@@ -39,6 +44,7 @@ if __name__ == "__main__":
         legend_list=["None"],
         use_opt=False, 
         dt=None, 
+        rlplanner_flag=True
     )
 
     for pidx in policy_idxs:
@@ -53,12 +59,12 @@ if __name__ == "__main__":
         qianxing_config["render_info"].update(run_config)
         qianxing_config["task_id"] = args_ref["qianxingp_task_id"]
 
-        runner.single_run(pidx, env_args=args_ref)
+        runner.single_run(pidx, plc_args=args_rlp, env_args=args_ref)
 
         if "path" in qianxing_config["render_info"].keys():
             path = qianxing_config["render_info"]["path"]
             print(qianxing_config["render_info"])
             fname = f"mdl_{models[pidx]}.mp4"
             process_batch(path, fname)
-            create_video_from_images(path, os.path.join(path, fname))
+            gen_video_cv2_mp4(path, os.path.join(path, fname))
 

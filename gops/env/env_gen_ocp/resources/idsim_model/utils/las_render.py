@@ -138,3 +138,18 @@ def load_from_pickle_iterable(file_path)->Generator[LasStateSurrogate, None, Non
             except EOFError:  # End of file
                 print(f"Loading finished with total {count} entries.")
                 break
+
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
+def ax2np(ax=None, fig=None):
+    ax = plt.gca() if ax is None else ax
+    fig = plt.gcf() if fig is None else fig
+
+    canvas = FigureCanvas(fig)
+    canvas.draw()
+
+    # Get the bounding box of the current axes
+    bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+
+    # Crop the canvas to the axis area and get image data
+    image_data = np.array(canvas.renderer.buffer_rgba())[int(bbox.y0):int(bbox.y1), int(bbox.x0):int(bbox.x1)]
