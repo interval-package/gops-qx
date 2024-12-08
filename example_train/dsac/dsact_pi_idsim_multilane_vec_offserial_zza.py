@@ -104,10 +104,10 @@ if __name__ == "__main__":
 
     # 1.1 Parameters for qianxing
     # using `qianxingp_` + `value`
-    parser.add_argument("--qianxingp_task_id", type=int, default=107, help="Qianxing task id")
+    parser.add_argument("--qianxingp_task_id", type=int, default=121, help="Qianxing task id")
     # parser.add_argument("--qianxingp_token", type=int, default=None, help="Qianxing token")
-    parser.add_argument("--qianxingp_traj_flag", type=bool, default=True, help="Qianxing traj saver")
-    parser.add_argument("--qianxingp_render_flag", type=bool, default=True, help="Qianxing traj render")
+    parser.add_argument("--qianxingp_traj_flag", type=bool, default=False, help="Qianxing traj saver")
+    parser.add_argument("--qianxingp_render_flag", type=bool, default=False, help="Qianxing traj render")
 
     ################################################
     # 2.1 Parameters of value approximate function

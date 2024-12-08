@@ -77,6 +77,7 @@ class LasvsimEnv(gym.Env):
     ):  
         self.port = port
         self.config = env_config
+        token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjE5LCJvaWQiOjEwMSwibmFtZSI6IuW8oOS5heaelyIsImlkZW50aXR5Ijoibm9ybWFsIiwicGVybWlzc2lvbnMiOltdLCJpc3MiOiJ1c2VyIiwic3ViIjoiTGFzVlNpbSIsImV4cCI6MTczMzcxMDY1MSwibmJmIjoxNzMzMTA1ODUxLCJpYXQiOjE3MzMxMDU4NTEsImp0aSI6IjE5In0.0_zAELU7rji5wHaE58HCvT0x93C7S-BcZeFAFM11U1I"
         self.metadata = [('authorization', 'Bearer ' + token)]
         self.step_counter = 0
         self.connections = dict()
@@ -90,7 +91,9 @@ class LasvsimEnv(gym.Env):
         self.sce_channel = grpc.intercept_channel(self.sce_insecure_channel.__enter__(),LoggingInterceptor())
         self.sce_stub = train_task_pb2_grpc.TrainTaskStub(self.sce_channel)
         # Note the task id wiil be overwrite in the qianxing_config at "gops/env/env_gen_ocp/resources/idsim_model/params.py"
-        self.scenario_list = self.sce_stub.GetSceneIdList(train_task_pb2.GetSceneIdListRequest(task_id = task_id), metadata = self.metadata).scene_id_list
+        res = self.sce_stub.GetSceneIdList(train_task_pb2.GetSceneIdListRequest(task_id = task_id), 
+                                           metadata = self.metadata)
+        self.scenario_list, self.version_list = res.scene_id_list, res.scene_version_list
 
         self.b_surr = b_surr
         self.timestamp = 0
@@ -108,6 +111,7 @@ class LasvsimEnv(gym.Env):
             self.startResp = self.stub.Init(
                 trainsim_pb2.InitReq(
                     scenario_id=self.scenario_list[0],
+                    scenario_version=self.version_list[0]
                 ),
                 metadata=self.metadata
             )
@@ -139,7 +143,10 @@ class LasvsimEnv(gym.Env):
 
         self.map_dict = dict()
         for i in range(len(self.scenario_list)):
-            startResp = self.stub.Init(trainsim_pb2.InitReq(scenario_id=self.scenario_list[i],),metadata=self.metadata)
+            startResp = self.stub.Init(
+                trainsim_pb2.InitReq(scenario_id=self.scenario_list[i],
+                                     scenario_version=self.version_list[i]),
+                                     metadata=self.metadata)
             cur_map = self.scenario_stub.GetHdMap(scenario_pb2.GetHdMapReq(simulation_id = startResp.simulation_id),metadata=self.metadata)
             self.map_dict[self.scenario_list[i]] = cur_map
         
@@ -279,7 +286,8 @@ class LasvsimEnv(gym.Env):
         if self.scenario_cnt <10:
             while len(test_vehicle_list) ==0:
                 self.resetResp = self.stub.Reset(
-                    trainsim_pb2.ResetReq(simulation_id=self.startResp.simulation_id),
+                    trainsim_pb2.ResetReq(simulation_id=self.startResp.simulation_id,
+                                          scenario_id=self.scenario_id),
                     metadata=self.metadata,
                 )
                 self.stepResult = self.stub.Step(
@@ -310,6 +318,7 @@ class LasvsimEnv(gym.Env):
                 self.startResp = self.stub.Init(
                     trainsim_pb2.InitReq(
                         scenario_id=self.scenario_id,
+                        scenario_version=self.version_list[idx],
                     ),
                     metadata=self.metadata
                 )
@@ -488,7 +497,8 @@ class LasvsimEnv(gym.Env):
                 neighbor.position.point.y,
                 neighbor.base_info.length,
                 neighbor.base_info.width,
-                neighbor.position.phi
+                neighbor.position.phi,
+                getattr(neighbor.base_info, "obj_id", "none")
             ]
             ret.append(row)
 
@@ -612,10 +622,10 @@ class LasvsimEnv(gym.Env):
 
         for index, neighbor in enumerate(original_nei):
             
-            center_x, center_y, length, width, phi = neighbor
+            center_x, center_y, length, width, phi, obj_id = neighbor
             
             if ego_x-self._render_cfg.draw_bound <= center_x and ego_x+self._render_cfg.draw_bound >= center_x and ego_y-self._render_cfg.draw_bound <= center_y and ego_y+self._render_cfg.draw_bound >= center_y:
-                car_rectangles.append(draw_car(center_x, center_y, length, width, phi, id=neighbor.obj_id))
+                car_rectangles.append(draw_car(center_x, center_y, length, width, phi, obj_id))
                 plt.gca().add_patch(car_rectangles[-1][0])
             
         ego_car_t = draw_car(float(self._ego[0]), float(self._ego[1]), float(self._ego[4]), float(self._ego[5]), self._state[4], "pink", "ego")

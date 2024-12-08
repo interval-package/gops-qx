@@ -110,11 +110,6 @@ class SimulationStub(object):
                 request_serializer=risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleCollisionInfoReq.SerializeToString,
                 response_deserializer=risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleCollisionInfoRes.FromString,
                 )
-        self.GetVehicleTargetSpeed = channel.unary_unary(
-                '/risenlighten.lasvsim.train_sim.api.trainsim.Simulation/GetVehicleTargetSpeed',
-                request_serializer=risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleTargetSpeedReq.SerializeToString,
-                response_deserializer=risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleTargetSpeedRes.FromString,
-                )
         self.SetVehicleControlInfo = channel.unary_unary(
                 '/risenlighten.lasvsim.train_sim.api.trainsim.Simulation/SetVehicleControlInfo',
                 request_serializer=risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.SetVehicleControlInfoReq.SerializeToString,
@@ -281,13 +276,6 @@ class SimulationServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetVehicleTargetSpeed(self, request, context):
-        """获取车辆目标速度
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def SetVehicleControlInfo(self, request, context):
         """修改车辆控制参数(方向盘转角、纵向加速度)
         """
@@ -420,11 +408,6 @@ def add_SimulationServicer_to_server(servicer, server):
                     servicer.GetVehicleCollisionInfo,
                     request_deserializer=risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleCollisionInfoReq.FromString,
                     response_serializer=risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleCollisionInfoRes.SerializeToString,
-            ),
-            'GetVehicleTargetSpeed': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetVehicleTargetSpeed,
-                    request_deserializer=risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleTargetSpeedReq.FromString,
-                    response_serializer=risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleTargetSpeedRes.SerializeToString,
             ),
             'SetVehicleControlInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.SetVehicleControlInfo,
@@ -782,23 +765,6 @@ class Simulation(object):
         return grpc.experimental.unary_unary(request, target, '/risenlighten.lasvsim.train_sim.api.trainsim.Simulation/GetVehicleCollisionInfo',
             risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleCollisionInfoReq.SerializeToString,
             risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleCollisionInfoRes.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetVehicleTargetSpeed(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/risenlighten.lasvsim.train_sim.api.trainsim.Simulation/GetVehicleTargetSpeed',
-            risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleTargetSpeedReq.SerializeToString,
-            risenlighten_dot_lasvsim_dot_train__sim_dot_api_dot_trainsim_dot_trainsim__pb2.GetVehicleTargetSpeedRes.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

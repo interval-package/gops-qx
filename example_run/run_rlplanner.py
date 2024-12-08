@@ -19,13 +19,20 @@ def parse_args():
 if __name__ == "__main__":
 
     args = parse_args()
-    qianxing_config["render_flag"] = False
-    qianxing_config["traj_flag"] = False
+    # qianxing_config["render_flag"] = True
+    # qianxing_config["traj_flag"] = True
 
     config_ref = args["qx_load"]
     args_ref = PolicyRunner._load_args(config_ref)
     args_ref = PolicyRunner._process_args(args_ref)
     # args_ref = None
+
+    args_ref["qx_config"].update({
+        "token": qianxing_config["token"],
+        "_debug_path_qxdata": None,
+        "render_flag": True,
+        "traj_flag": True,
+    })
 
     config_rlp = args["rlplanner_load"]
     args_rlp = PolicyRunner._load_args(config_rlp)

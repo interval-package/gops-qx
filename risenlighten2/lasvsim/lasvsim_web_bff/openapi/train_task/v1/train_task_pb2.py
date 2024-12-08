@@ -17,7 +17,7 @@ from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from validate2 import validate_pb2 as validate_dot_validate__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\nKrisenlighten/lasvsim/lasvsim_web_bff/openapi/train_task/v1/train_task.proto\x12:risenlighten.lasvsim.lasvsim_web_bff.openapi.train_task.v1\x1a\x1copenapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x17validate/validate.proto\"1\n\x15GetSceneIdListRequest\x12\x18\n\x07task_id\x18\x01 \x01(\x04\x42\x07\xfa\x42\x04\x32\x02 \x00\"H\n\x13GetSceneIdListReply\x12\x15\n\rscene_id_list\x18\x01 \x03(\t\x12\x1a\n\x12scene_version_list\x18\x02 \x03(\t2\x9e\x02\n\tTrainTask\x12\x90\x02\n\x0eGetSceneIdList\x12Q.risenlighten.lasvsim.lasvsim_web_bff.openapi.train_task.v1.GetSceneIdListRequest\x1aO.risenlighten.lasvsim.lasvsim_web_bff.openapi.train_task.v1.GetSceneIdListReply\"Z\x82\xd3\xe4\x93\x02%\x12#/train_task/{task_id}/scene_id_list\xbaG,\n\x06v0.0.1\x12\"\xe6\xa0\xb9\xe6\x8d\xae\xe4\xbb\xbb\xe5\x8a\xa1Id\xe8\x8e\xb7\xe5\x8f\x96\xe5\x9c\xba\xe6\x99\xafId\xe5\x88\x97\xe8\xa1\xa8\x42PZNgit.risenlighten.com/lasvsim/lasvsim_web_bff/openapi/train_task/v1;traintaskv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\nKrisenlighten/lasvsim/lasvsim_web_bff/openapi/train_task/v1/train_task.proto\x12:risenlighten.lasvsim.lasvsim_web_bff.openapi.train_task.v1\x1a\x1copenapi/v3/annotations.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x17validate/validate.proto\"1\n\x15GetSceneIdListRequest\x12\x18\n\x07task_id\x18\x01 \x01(\x04\x42\x07\xfa\x42\x04\x32\x02 \x00\",\n\x13GetSceneIdListReply\x12\x15\n\rscene_id_list\x18\x01 \x03(\t2\x9e\x02\n\tTrainTask\x12\x90\x02\n\x0eGetSceneIdList\x12Q.risenlighten.lasvsim.lasvsim_web_bff.openapi.train_task.v1.GetSceneIdListRequest\x1aO.risenlighten.lasvsim.lasvsim_web_bff.openapi.train_task.v1.GetSceneIdListReply\"Z\x82\xd3\xe4\x93\x02%\x12#/train_task/{task_id}/scene_id_list\xbaG,\n\x06v0.0.1\x12\"\xe6\xa0\xb9\xe6\x8d\xae\xe4\xbb\xbb\xe5\x8a\xa1Id\xe8\x8e\xb7\xe5\x8f\x96\xe5\x9c\xba\xe6\x99\xafId\xe5\x88\x97\xe8\xa1\xa8\x42PZNgit.risenlighten.com/lasvsim/lasvsim_web_bff/openapi/train_task/v1;traintaskv1b\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'risenlighten.lasvsim.lasvsim_web_bff.openapi.train_task.v1.train_task_pb2', globals())
@@ -32,7 +32,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _GETSCENEIDLISTREQUEST._serialized_start=253
   _GETSCENEIDLISTREQUEST._serialized_end=302
   _GETSCENEIDLISTREPLY._serialized_start=304
-  _GETSCENEIDLISTREPLY._serialized_end=376
-  _TRAINTASK._serialized_start=379
-  _TRAINTASK._serialized_end=665
+  _GETSCENEIDLISTREPLY._serialized_end=348
+  _TRAINTASK._serialized_start=351
+  _TRAINTASK._serialized_end=637
 # @@protoc_insertion_point(module_scope)

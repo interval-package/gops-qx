@@ -104,8 +104,8 @@ Most essential, need to caution
 """
 
 qianxing_config = {
-    'token':None,
-    'task_id': None,
+    'token':"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjE5LCJvaWQiOjEwMSwibmFtZSI6IuW8oOS5heaelyIsImlkZW50aXR5Ijoibm9ybWFsIiwicGVybWlzc2lvbnMiOltdLCJpc3MiOiJ1c2VyIiwic3ViIjoiTGFzVlNpbSIsImV4cCI6MTczMzcxMDY1MSwibmJmIjoxNzMzMTA1ODUxLCJpYXQiOjE3MzMxMDU4NTEsImp0aSI6IjE5In0.0_zAELU7rji5wHaE58HCvT0x93C7S-BcZeFAFM11U1I",
+    'task_id': 110,
     'record_id': [1, 2, 3], ## simulation id list
     'b_surr': True,
     "render_flag": False,

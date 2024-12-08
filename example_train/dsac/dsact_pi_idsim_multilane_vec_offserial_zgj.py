@@ -38,7 +38,7 @@ if __name__ == "__main__":
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
     parser.add_argument("--env_scenario", type=str, default="multilane", help="crossroad / multilane")
-    parser.add_argument("--num_threads_main", type=int, default=4, help="Number of threads in main process")
+    parser.add_argument("--num_threads_main", type=int, default=1, help="Number of threads in main process")
     env_scenario = parser.parse_known_args()[0].env_scenario
 
     base_env_config = get_idsim_env_config(env_scenario)
@@ -210,7 +210,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--ini_network_dir",
         type=str,
-        default='/root/qianxing/gops-grpc/DSACTPI_240701-180131/apprfunc/apprfunc_795280_opt.pkl'
+        # default='/root/qianxing/gops-grpc/DSACTPI_240701-180131/apprfunc/apprfunc_795280_opt.pkl'
+        default=None,
     )
     trainer_type = parser.parse_known_args()[0].trainer
     # 4.1. Parameters for off_serial_trainer
