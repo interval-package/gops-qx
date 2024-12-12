@@ -32,7 +32,7 @@ from gops.env.env_gen_ocp.resources.idsim_model.utils.las_render import \
     RenderCfg, _render_tags, LasStateSurrogate, append_to_pickle_incremental, render_tags_debug
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-
+import json
 
 class LoggingInterceptor(grpc.UnaryUnaryClientInterceptor):
     def intercept_unary_unary(self, continuation, client_call_details, request):
@@ -77,7 +77,6 @@ class LasvsimEnv(gym.Env):
     ):  
         self.port = port
         self.config = env_config
-        token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjE5LCJvaWQiOjEwMSwibmFtZSI6IuW8oOS5heaelyIsImlkZW50aXR5Ijoibm9ybWFsIiwicGVybWlzc2lvbnMiOltdLCJpc3MiOiJ1c2VyIiwic3ViIjoiTGFzVlNpbSIsImV4cCI6MTczMzcxMDY1MSwibmJmIjoxNzMzMTA1ODUxLCJpYXQiOjE3MzMxMDU4NTEsImp0aSI6IjE5In0.0_zAELU7rji5wHaE58HCvT0x93C7S-BcZeFAFM11U1I"
         self.metadata = [('authorization', 'Bearer ' + token)]
         self.step_counter = 0
         self.connections = dict()
@@ -437,6 +436,7 @@ class LasvsimEnv(gym.Env):
             print(f"Into the data verbose mode. render: {self.render_flag}, traj: {self.traj_flag}")
 
         _map = Map()
+        # New interface not support hdmap obj
         _map.load_hd(self.map_dict[self.scenario_list[0]])
 
         path_flag = render_info.get("_debug_path_qxdata", None)
@@ -481,8 +481,8 @@ class LasvsimEnv(gym.Env):
         if self.render_flag:
             f = plt.figure(figsize=(16,9))
             # draw totoal map
-            # self.map.draw()
-            # plt.cla()
+            _map.draw()
+            plt.cla()
             
             f.subplots_adjust(left=0.25)
             _map.draw_everything(show_id=False, show_link_boundary=False)
@@ -509,7 +509,7 @@ class LasvsimEnv(gym.Env):
         _debug_adaptive_vars = {
             # "_debug_dyn_state"    : self._debug_dyn_state.numpy(),
             "_debug_done_errlat"  : self._debug_done_errlat ,
-            "_debug_done_errlon"  : self._debug_done_errlon ,
+            # "_debug_done_errlon"  : self._debug_done_errlon ,
             "_debug_done_errhead" : self._debug_done_errhead,
             "_debug_done_postype" : self._debug_done_postype,
             "_debug_reward_scaled_punish_boundary": self._debug_reward_scaled_punish_boundary,
@@ -776,7 +776,7 @@ class LasvsimEnv(gym.Env):
             reward_steering = reward_steering * 5
 
         abs_ax = np.abs(last_acc)
-        reward_acc_long = -np.where(abs_ax < 2, np.square(abs_ax), 2*abs_ax)
+        reward_acc_long = -np.where(abs_ax < 2, np.square(abs_ax), 2*abs_ax) * 0.0
 
         reward_delta_steer = -np.where(np.abs(delta_steer) < 4, np.square(delta_steer), 2*np.abs(delta_steer)+8)
         reward_jerk = -np.where(np.abs(jerk) < 2, np.square(jerk), 2*np.abs(jerk)+8)
@@ -890,13 +890,13 @@ class LasvsimEnv(gym.Env):
             self.in_junction = False
             
         tracking_error_lat = -math.sin(current_first_ref_phi) * (ego_x - current_first_ref_x) + math.cos(current_first_ref_phi) * (ego_y - current_first_ref_y)
-        tracking_error_long = math.cos(current_first_ref_phi) * (ego_x - current_first_ref_x) + math.sin(current_first_ref_phi) * (ego_y - current_first_ref_y)
+        # tracking_error_long = math.cos(current_first_ref_phi) * (ego_x - current_first_ref_x) + math.sin(current_first_ref_phi) * (ego_y - current_first_ref_y)
         self.out_of_range = (tracking_error_lat > 8) \
-                            or (np.abs(delta_phi) > np.pi/4) \
-                            or (tracking_error_long > 2) \
+                            or (np.abs(delta_phi) > np.pi/2) \
+                            # or (tracking_error_long > 2) \
                             # or (ego_pos == 1)
         self._debug_done_errlat  = tracking_error_lat > 8
-        self._debug_done_errlon  = tracking_error_long > 2
+        # self._debug_done_errlon  = tracking_error_long > 2
         self._debug_done_errhead = np.abs(delta_phi) > np.pi/4
         self._debug_done_postype = ego_pos == 1
         

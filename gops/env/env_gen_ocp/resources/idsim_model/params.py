@@ -114,7 +114,7 @@ qianxing_config = {
     # this will be shared
     "render_info": {
         "_debug_path_qxdata": None,
-        "draw_bound": 300,
+        "draw_bound": 30,
         "show_npc": True,
         "type": ".png",
         "dpi": 300

@@ -4,7 +4,7 @@ import os
 from gops.sys_simulator.qxsys_run import PolicyRunner
 from gops.env.env_gen_ocp.resources.idsim_model.params import qianxing_config
 from gops.env.env_gen_ocp.resources.idsim_model.utils.vedio_utils.generate_gif import process_batch
-from gops.env.env_gen_ocp.resources.idsim_model.utils.vedio_utils.generate_vedio import gen_video_cv2_mp4
+from gops.env.env_gen_ocp.resources.idsim_model.utils.vedio_utils.generate_vedio import gen_video_cv2_mp4, gen_video_imio_mp4
 
 def parse_args():
     parser = ArgumentParser()
@@ -64,6 +64,6 @@ if __name__ == "__main__":
         if "_debug_path_qxdata" in qianxing_config["render_info"].keys():
             path = qianxing_config["render_info"]["_debug_path_qxdata"]
             print(qianxing_config["render_info"])
-            fname = f"mdl_{models[pidx]}"
-            process_batch(path, fname)
-            # create_video_from_images(path, os.path.join(path, fname))
+            fname = f"mdl_{models[pidx]}.mp4"
+            # process_batch(path, fname)
+            gen_video_imio_mp4(path, os.path.join(path, fname))

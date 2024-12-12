@@ -27,7 +27,7 @@ def images_to_gif(images, gif_path, duration=500):
             loop=0  # 0 表示无限循环
         )
 
-fps = 30
+fps = 60
 
 def images_to_mp4(images: List[Image.Image], gif_path, duration=0.3):
     assert images, "Empty."
@@ -41,9 +41,9 @@ def images_to_mp4(images: List[Image.Image], gif_path, duration=0.3):
             video.write(cv2.cvtColor(np.array(frame), cv2.COLOR_RGB2BGR))
     video.release()
 
-def process_batch(img_folder, name="result"):
+def process_batch(img_folder, name="result", data_attr=".png", ret_type="mp4"):
     # 获取所有文件名，并按数字排序
-    img_files = [f for f in os.listdir(img_folder) if f.lower().endswith('.png')]
+    img_files = [f for f in os.listdir(img_folder) if f.lower().endswith(data_attr)]
     
     # 将文件名转换为整数进行排序
     img_files.sort(key=lambda x: int(os.path.splitext(x)[0]))
