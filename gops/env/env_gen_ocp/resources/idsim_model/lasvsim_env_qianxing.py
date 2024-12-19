@@ -1444,29 +1444,24 @@ class LasvsimEnv(gym.Env):
         input_data.time_stamp.t = self.timestamp         
         self.timestamp += 1
 
-    def covert_map(self,scenario_id):
+    def covert_map(self, scenario_id):
         traffic_map = self.map_dict[scenario_id]
-        for link in traffic_map.hdmap.links:
-            self.links[link.link_id] = link
-        for lane in traffic_map.hdmap.lanes:
-            self.lanes[lane.lane_id] = lane
-        for segment in traffic_map.hdmap.segments:
-            self.segments[segment.segment_id] = segment
-        for junction in traffic_map.hdmap.junctions:
-            self.junctions[junction.junction_id] = junction
-        for connection in traffic_map.hdmap.connections:
-            self.connections[connection.connection_id] = connection
+        for segment in traffic_map.data.segments:
+            for link in segment.ordered_links:
+                for lane in link.ordered_lanes:
+                    print("lane: ",lane)
+                    self.lanes[lane.id] = lane
 
-    def get_direction(self,link_route:List[str]):
+    def get_direction(self, link_route: List[str]):
         direction_list = []
         assert len(link_route) > 0, "link_route is empty"
         for i in range(len(link_route) - 1):
-            #获取当前link的所有下游link
+            # 获取当前link的所有下游link
             next_link_list = self.get_next_link(link_route[i])
-            if link_route[i+1] in next_link_list:
+            if link_route[i + 1] in next_link_list:
                 direction_list.append(self.get_link_direction(link_route[i]))
             else:
-                connection_id_list = self.get_connection_id(link_route[i], link_route[i+1])
+                connection_id_list = self.get_connection_id(link_route[i], link_route[i + 1])
                 if len(connection_id_list) == 0:
                     return "other"
                 else:
@@ -1481,7 +1476,7 @@ class LasvsimEnv(gym.Env):
         else:
             return "straight"
 
-    def get_next_link(self,link_id):
+    def get_next_link(self, link_id):
         link = self.links[link_id]
         lane_id_list = link.ordered_lane_ids
         next_link_set = set()
@@ -1497,7 +1492,7 @@ class LasvsimEnv(gym.Env):
 
         return list(next_link_set)
 
-    def get_link_direction(self,link_id):
+    def get_link_direction(self, link_id):
         lane_id_list = self.links[link_id].ordered_lane_ids
         one_valid_lane_id = None
         for lane_id in lane_id_list:
@@ -1511,15 +1506,14 @@ class LasvsimEnv(gym.Env):
 
         return self.get_lane_direction(one_valid_lane_id)
 
-    def get_lane_direction(self,lane_id):
+    def get_lane_direction(self, lane_id):
         lane_path = self.get_ref_path_by_id(lane_id)
         if not lane_path:
             return "unknown"
 
-
         lane_path_phi = []
-        for i in range(len(lane_path)-1):
-            lane_path_phi.append(math.atan2(lane_path[i+1].y-lane_path[i].y,lane_path[i+1].x-lane_path[i].x))
+        for i in range(len(lane_path) - 1):
+            lane_path_phi.append(math.atan2(lane_path[i + 1].y - lane_path[i].y, lane_path[i + 1].x - lane_path[i].x))
         lane_path_phi = np.array(lane_path_phi)
         # 计算航向角变化，考虑越过 ±π 的情况
         delta_phi = np.diff(lane_path_phi)
@@ -1538,20 +1532,20 @@ class LasvsimEnv(gym.Env):
         else:
             return "straight"
 
-    def get_ref_path_by_id(self,lane_id):
+    def get_ref_path_by_id(self, lane_id):
         if lane_id in self.connections:
             return self.connections[lane_id].path
         else:
             return self.lanes[lane_id].center_line
 
-    def get_connection_id(self,upstream_link_id, downstream_link_id):
+    def get_connection_id(self, upstream_link_id, downstream_link_id):
         connection_id_list = []
-        for key,connection in self.connections.items():
+        for key, connection in self.connections.items():
             if connection.upstream_link_id == upstream_link_id and connection.downstream_link_id == downstream_link_id:
                 connection_id_list.append(connection.connection_id)
         return connection_id_list
 
-    def convert_coordinates(self,x, y, source_origin, target_origin, angle):
+    def convert_coordinates(self, x, y, source_origin, target_origin, angle):
         """
         转换平面坐标从源坐标系到目标坐标系
 
@@ -1580,12 +1574,23 @@ class LasvsimEnv(gym.Env):
 
         return target_x, target_y
 
-    def angle_normalize(self,x):
+    def angle_normalize(self, x):
         return ((x + math.pi) % (2 * math.pi)) - math.pi
 
     def get_boundary_distance(self):
+        def calculate_perpendicular_points(x0, y0, direction_radians, distance):
+            dx = -math.sin(direction_radians)
+            dy = math.cos(direction_radians)
+            
+            x1 = x0 + distance * dx
+            y1 = y0 + distance * dy
+            x2 = x0 - distance * dx
+            y2 = y0 - distance * dy
+            
+            return (x1, y1), (x2, y2)
         def cal_distance(x1, y1, x2, y2):
-            return ((x1-x2)**2 + (y1-y2)**2)**0.5
+            return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
+
         assert not self.in_junction
         pos = self.stub.GetVehiclePosition(
             trainsim_pb2.GetVehiclePositionReq(simulation_id=self.startResp.simulation_id,
@@ -1593,19 +1598,23 @@ class LasvsimEnv(gym.Env):
         ego_lane = pos.position_dict.get(self.ego_id).lane_id
         lane_list = self.lanes
         lane_width = 3.75
-        left_lane, right_lane = lane_list[ego_lane].left_lane_mark, lane_list[ego_lane].right_lane_mark
-        left_lane = np.array([[point.x, point.y] for point in left_lane.shape])
-        left_lane = LineString(left_lane[:,:2])
-        right_lane = np.array([[point.x, point.y] for point in right_lane.shape])
-        right_lane = LineString(right_lane[:, :2])
-        Rb_position = point_project_to_line(right_lane, self._state[0],self._state[1])
-        Rb_x, Rb_y, _ = compute_waypoint(right_lane, Rb_position)
-        right_center_distance = cal_distance(Rb_x, Rb_y, self._state[0],self._state[1])
+        target_lane = lane_list[ego_lane]
+        left1,right1 = calculate_perpendicular_points(target_lane.center_line[0].point.x,target_lane.center_line[0].point.y,target_lane.center_line[0].heading,target_lane.center_line[0].left_width)
+        left2,right2 = calculate_perpendicular_points(target_lane.center_line[1].point.x,target_lane.center_line[1].point.y,target_lane.center_line[1].heading,target_lane.center_line[1].left_width)
 
-        Lb_position = point_project_to_line(left_lane, self._state[0],self._state[1])
+        left_lane_new,right_lane_new = [left1,left2],[right1,right2]
+        
+    
+        left_lane = LineString(np.array(left_lane_new)[:, :2])
+        right_lane = LineString(np.array(right_lane_new)[:, :2])
+        Rb_position = point_project_to_line(right_lane, self._state[0], self._state[1])
+        Rb_x, Rb_y, _ = compute_waypoint(right_lane, Rb_position)
+        right_center_distance = cal_distance(Rb_x, Rb_y, self._state[0], self._state[1])
+
+        Lb_position = point_project_to_line(left_lane, self._state[0], self._state[1])
         Lb_x, Lb_y, _ = compute_waypoint(left_lane, Lb_position)
-        left_center_distance = cal_distance(Lb_x, Lb_y, self._state[0],self._state[1])
-        return left_center_distance,right_center_distance
+        left_center_distance = cal_distance(Lb_x, Lb_y, self._state[0], self._state[1])
+        return left_center_distance, right_center_distance
 
 def env_creator(**kwargs: Any) -> LasvsimEnv:
     return LasvsimEnv(**kwargs)
