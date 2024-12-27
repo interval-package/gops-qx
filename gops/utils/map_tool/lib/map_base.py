@@ -48,6 +48,48 @@ class MapBase:
             self.junction2idx[junction.junction_id] = i
             self.junction_id_list.append(junction.junction_id)
 
+    def load_new(self,map_file_name):
+        with open(map_file_name, "r", encoding="utf-8") as f:
+            json_obj = json.load(f)
+        self.map_pb = {}
+        self.map_pb["links"] = []
+        self.map_pb["lanes"] = []
+        self.map_pb["junctions"] = []
+        self.map_pb["segments"] = []
+        self.map_pb["stop_lines"] = []
+        self.map_pb["connections"] = []
+        link_index = 0  
+        lane_index = 0
+        for index, segment in enumerate(json_obj["segments"]):
+            self.map_pb["segments"].append(segment)
+            self.segment2idx[segment["id"]] = index
+            self.segment_id_list.append(segment["id"])
+
+            for link in segment["ordered_links"]:
+                link["segment_id"] = segment["id"]
+                self.link2idx[link["id"]] = link_index
+                link_index += 1
+                self.link_id_list.append(link["id"])
+                
+                self.map_pb["links"].append(link)
+                
+                for lane in link["ordered_lanes"]:
+                    self.lane2idx[lane["id"]] = lane_index
+                    lane_index += 1
+                    self.lane_id_list.append(lane["id"])
+                    self.map_pb["lanes"].append(lane)
+                    stopline = lane.get("stopline")
+                    if stopline is not None:
+                        self.map_pb["stop_lines"].append(stopline)
+
+        
+        for index,junction in enumerate(json_obj["junctions"]):
+            self.junction2idx[junction["id"]] = index
+            self.junction_id_list.append(junction["id"])
+            self.map_pb["segments"].append(segment)
+            for _, connection in enumerate(junction.get("connections", [])):
+                self.map_pb["connections"].append(connection)
+
     def get_lane_by_id(self, id):
         assert id in self.lane_id_list, "lane id `{}` not in map".format(id)
         idx = self.lane2idx[id]

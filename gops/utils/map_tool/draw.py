@@ -10,6 +10,11 @@ MAP_NAME = "crossroads_map"
 
 def draw():
     map = Map()
+
+    # Load new maps
+    map.load_new("/root/qianxing/gops-grpc/gops/utils/map_tool/lib/map/crossroads_map_refined.json")
+
+    # Load old maps
     map.load("/root/qianxing/gops-grpc/gops/utils/map_tool/lib/map/crossroads_map_refined.json")
     # map.load("./map/{}.json".format(MAP_NAME))
 

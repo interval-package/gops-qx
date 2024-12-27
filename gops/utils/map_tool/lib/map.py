@@ -136,8 +136,9 @@ class Map(MapBase):
         cp_idx = len(lane.center_line) // 2
         # print(len(lane.center_line), cp_idx, lane.lane_id)
         cp = lane.center_line[cp_idx]
-
-        return cp.x, cp.y
+        x = cp.get("point", {}).get("x", 0)
+        y = cp.get("point", {}).get("y", 0)
+        return x, y
 
     @staticmethod
     def _find_link_boundary_central_point(link):
@@ -184,12 +185,12 @@ class Map(MapBase):
     def _draw_junction_shape(junction, color_val):
         px = []
         py = []
-        for p in junction.shape:
-            px.append(float(p.x))
-            py.append(float(p.y))
-        for p in junction.shape:
-            px.append(float(p.x))
-            py.append(float(p.y))
+        for p in junction["shape"]:
+            px.append(float(p["point"].get("x", 0)))
+            py.append(float(p["point"].get("y", 0)))
+        for p in junction["shape"]:
+            px.append(float(p["point"].get("x", 0)))
+            py.append(float(p["point"].get("y", 0)))
             break
         plt.plot(px, py, ls="-", c=color_val, alpha=0.5)
 
