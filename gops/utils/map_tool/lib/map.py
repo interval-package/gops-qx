@@ -30,22 +30,49 @@ class Map(MapBase):
     #         json_str = json.dumps(json_obj, indent=4)
 
     def load_hd(self, traffic_map):
-        self.map_pb = traffic_map.hdmap
-        for i, lane in enumerate(traffic_map.hdmap.lanes):
-            self.lane2idx[lane.lane_id] = i
-            self.lane_id_list.append(lane.lane_id)
+        self.map_pb = traffic_map.data
+        json_obj = json_format.MessageToDict(self.map_pb,preserving_proto_field_name=True)
+        print(json_obj.keys())
+        # file_path = '/home/idlab/code/qx-oracle/data_qx/rl_planner/output.json'
+        # with open(file_path, 'w', encoding='utf-8') as f:
+        #     json.dump(json_obj, f, indent=4)
+        self.map_pb = {}
+        self.map_pb["links"] = []
+        self.map_pb["lanes"] = []
+        self.map_pb["junctions"] = []
+        self.map_pb["segments"] = []
+        self.map_pb["stop_lines"] = []
+        self.map_pb["connections"] = []
+        link_index = 0  
+        lane_index = 0
+        for index, segment in enumerate(json_obj["segments"]):
+            self.map_pb["segments"].append(segment)
+            self.segment2idx[segment["id"]] = index
+            self.segment_id_list.append(segment["id"])
 
-        for i, link in enumerate(traffic_map.hdmap.links):
-            self.link2idx[link.link_id] = i
-            self.link_id_list.append(link.link_id)
+            for link in segment["ordered_links"]:
+                link["segment_id"] = segment["id"]
+                self.link2idx[link["id"]] = link_index
+                link_index += 1
+                self.link_id_list.append(link["id"])
+                
+                self.map_pb["links"].append(link)
+                
+                for lane in link["ordered_lanes"]:
+                    self.lane2idx[lane["id"]] = lane_index
+                    lane_index += 1
+                    self.lane_id_list.append(lane["id"])
+                    self.map_pb["lanes"].append(lane)
+                    stopline = lane.get("stopline")
+                    if stopline is not None:
+                        self.map_pb["stop_lines"].append(stopline)
 
-        for i, segment in enumerate(traffic_map.hdmap.segments):
-            self.segment2idx[segment.segment_id] = i
-            self.segment_id_list.append(segment.segment_id)
-
-        for i, junction in enumerate(traffic_map.hdmap.junctions):
-            self.junction2idx[junction.junction_id] = i
-            self.junction_id_list.append(junction.junction_id)
+        for index,junction in enumerate(json_obj["junctions"]):
+            self.junction2idx[junction["id"]] = index
+            self.junction_id_list.append(junction["id"])
+            self.map_pb["segments"].append(segment)
+            for _, connection in enumerate(junction.get("connections", [])):
+                self.map_pb["connections"].append(connection)
 
     def init_colors(self):
         color_num = 6
