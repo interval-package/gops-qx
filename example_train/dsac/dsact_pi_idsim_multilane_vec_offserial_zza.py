@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     ################################################
     # Key Parameters for users
-    parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
+    parser.add_argument("--env_id", type=str, default="pyth_lasvsim_planning", help="id of environment")
     parser.add_argument("--env_scenario", type=str, default="multilane", help="crossroad / multilane")
     parser.add_argument("--num_threads_main", type=int, default=4, help="Number of threads in main process")
     env_scenario = parser.parse_known_args()[0].env_scenario
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
     parser.add_argument("--scenerios_list", type=list, default=[':19','19:'])
 
-    parser.add_argument("--vector_env_num", type=int, default=None, help="Number of vector envs")
+    parser.add_argument("--vector_env_num", type=int, default=4, help="Number of vector envs")
     parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
     parser.add_argument("--gym2gymnasium", type=bool, default=True, help="Convert Gym-style env to Gymnasium-style")
 
@@ -88,7 +88,12 @@ if __name__ == "__main__":
         env_model_config=base_env_model_config
     )
     parser.add_argument("--obs_scale", type=dict, default=obs_scale)
-    parser.add_argument("--repeat_num", type=int, default=4, help="action repeat num")
+    repeat_num = 1
+    act_seq_len = 20
+    parser.add_argument("--repeat_num", type=int, default=repeat_num, help="action repeat num")
+    parser.add_argument("--act_seq_len", type=int, default=act_seq_len, help="action repeat num")
+    parser.add_argument("--act_seq_nn", type=int, default=act_seq_len, help="action repeat num")
+    parser.add_argument("--sum_reward", type=bool, default=False, help="sum reward")
 
     parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
@@ -125,6 +130,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--value_output_activation", type=str, default="linear", help="Options: linear/tanh")
 
+    # truncated_reward
+    parser.add_argument("--truncated_reward", type=bool, default=False)
 
     # 2.2 Parameters of policy approximate function
     parser.add_argument(
@@ -153,23 +160,23 @@ if __name__ == "__main__":
     # 2.3 Parameters of shared approximate function
     pi_paras = cal_idsim_pi_paras(env_config=base_env_config, env_model_config=base_env_model_config)
     parser.add_argument("--target_PI", type=bool, default=True)
-    parser.add_argument("--enable_self_attention", type=bool, default=False)
+    parser.add_argument("--enable_self_attention", type=bool, default=True)
     parser.add_argument("--pi_begin", type=int, default=pi_paras["pi_begin"])
     parser.add_argument("--pi_end", type=int, default=pi_paras["pi_end"])
     parser.add_argument("--enable_mask", type=bool, default=True)
     parser.add_argument("--obj_dim", type=int, default=pi_paras["obj_dim"])
-    parser.add_argument("--attn_dim", type=int, default=64)
-    parser.add_argument("--pi_out_dim", type=int, default=pi_paras["output_dim"])
+    parser.add_argument("--head_num", type=int, default=8)
+    parser.add_argument("--pi_out_dim", type=int, default= 256)
     parser.add_argument("--pi_hidden_sizes", type=list, default=[256,256,256])
     parser.add_argument("--pi_hidden_activation", type=str, default="gelu")
-    parser.add_argument("--pi_output_activation", type=str, default="linear")
-    parser.add_argument("--freeze_pi_net", type=str, default="critic")
+    parser.add_argument("--pi_output_activation", type=str, default="gelu")
+    parser.add_argument("--freeze_pi_net", type=str, default="none")
     parser.add_argument("--encoding_others", type=bool, default=False)
     parser.add_argument("--others_hidden_sizes", type=list, default=[64,64])
     parser.add_argument("--others_hidden_activation", type=str, default="gelu")
     parser.add_argument("--others_output_activation", type=str, default="linear")
     parser.add_argument("--others_out_dim", type=int, default=32)
-    max_iter = 1000000
+    max_iter = 1_000_000
     parser.add_argument("--policy_scheduler", type=json.loads, default={
         "name": "CosineAnnealingLR",
         "params": {
@@ -206,12 +213,13 @@ if __name__ == "__main__":
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
     parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
-    parser.add_argument("--pi_learning_rate", type=float, default=1e-4)
-    parser.add_argument("--alpha_learning_rate", type=float, default=1e-5)
+    parser.add_argument("--pi_learning_rate", type=float, default=1e-5)
+    parser.add_argument("--alpha_learning_rate", type=float, default=3e-4)
 
     # special parameter
-    parser.add_argument("--gamma", type=float, default=0.99)
-    parser.add_argument("--tau", type=float, default=0.005)
+    gamma = 0.9 ** (repeat_num * act_seq_len / 4) 
+    parser.add_argument("--gamma", type=float, default=gamma)
+    parser.add_argument("--tau", type=float, default=0.001)
     parser.add_argument("--auto_alpha", type=bool, default=True)
     parser.add_argument("--alpha", type=bool, default=0.2)
     parser.add_argument("--delay_update", type=int, default=2)
@@ -226,23 +234,6 @@ if __name__ == "__main__":
         default='off_serial_idsim_trainer', #"off_serial_idsim_trainer",off_async_trainer
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
-    trainer_type = parser.parse_known_args()[0].trainer
-
-    if trainer_type.startswith("off_async"):
-        parser.add_argument("--num_algs", type=int, default=1)
-        parser.add_argument("--num_samplers", type=int, default=1)
-        parser.add_argument("--num_buffers", type=int, default=1)
-        cpu_core_num = multiprocessing.cpu_count()
-        num_core_input = (
-            parser.parse_known_args()[0].num_algs
-            + parser.parse_known_args()[0].num_samplers
-            + parser.parse_known_args()[0].num_buffers
-            + 2
-        )
-        if num_core_input > cpu_core_num:
-            raise ValueError("The number of core is {}, but you want {}!".format(cpu_core_num, num_core_input))
-        parser.add_argument("--alg_queue_max_size", type=int, default=1)
-
     # Maximum iteration number
     parser.add_argument("--max_iteration", type=int, default=max_iter)
     parser.add_argument(
@@ -259,7 +250,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--category_num", type=int, default=6, help="Number of categories for stratified replay buffer")
     # Size of collected samples before training
-    parser.add_argument("--buffer_warm_size", type=int, default=10000)
+    parser.add_argument("--buffer_warm_size", type=int, default=1000)
     # Max size of reply buffer
     parser.add_argument("--buffer_max_size", type=int, default=225000)
     # Batch size of replay samples from buffer
@@ -273,21 +264,24 @@ if __name__ == "__main__":
     # Batch size of sampler for buffer store
     parser.add_argument("--sample_batch_size", type=int, default=80)
     # Add noise to action for better exploration
-    parser.add_argument("--noise_params", type=dict, default={"mean": np.array([0,0], dtype=np.float32), "std": np.array([0.1,0.1], dtype=np.float32),},
+    action_seq_len = parser.parse_known_args()[0].act_seq_len or 1
+    mean = np.tile(np.array([0,0], dtype=np.float32), action_seq_len)
+    std = np.tile(np.array([0.2,0.2], dtype=np.float32), action_seq_len)
+    parser.add_argument("--noise_params", type=dict, default={"mean": mean, "std": std,},
         help="used for continuous action space")
 
     ################################################
     # 6. Parameters for evaluator
     parser.add_argument("--evaluator_name", type=str, default="idsim_train_evaluator")
     parser.add_argument("--num_eval_episode", type=int, default=10)
-    parser.add_argument("--eval_interval", type=int, default=50)
+    parser.add_argument("--eval_interval", type=int, default=5000)
     parser.add_argument("--eval_save", type=str, default=False, help="save evaluation data")
 
     ################################################
     # 7. Data savings
     parser.add_argument("--save_folder", type=str, default=None)
     # Save value/policy every N updates
-    parser.add_argument("--apprfunc_save_interval", type=int, default=1000)
+    parser.add_argument("--apprfunc_save_interval", type=int, default=50000)
     # Save key info every N updates
     parser.add_argument("--log_save_interval", type=int, default=1000)
 
@@ -313,13 +307,12 @@ if __name__ == "__main__":
         _qx_key = "_".join(key.split("_")[1:])
         qianxing_config[_qx_key] = args[key]
     
-    env = create_env(**{**args, "vector_env_num": None})
-    # env = create_env(**args)
-
     qianxing_config["render_flag"] = False
     qianxing_config["traj_flag"] = False
     # The config is inited and the path specified, hence no more modification
     args["qx_config"] = qianxing_config
+    env = create_env(**{**args, "vector_env_num": None})
+    # env = create_env(**args)
     args = init_args(env, **args)
 
     # start_tensorboarsd(args["save_folder"])

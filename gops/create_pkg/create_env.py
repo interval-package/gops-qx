@@ -21,6 +21,7 @@ from gym.wrappers.time_limit import TimeLimit
 from gops.env.vector.sync_vector_env import SyncVectorEnv
 from gops.env.vector.async_vector_env import AsyncVectorEnv
 from gops.env.wrapper.action_repeat import ActionRepeatData
+from gops.env.wrapper.action_sequence import ActionSeqData
 from gops.env.wrapper.convert_type import ConvertType
 from gops.env.wrapper.gym2gymnasium import Gym2Gymnasium
 from gops.env.wrapper.noise_observation import NoiseData
@@ -93,7 +94,9 @@ def create_env(
     obs_noise_type: Optional[str] = None,
     obs_noise_data: Optional[list] = None,
     repeat_num: Optional[int] = None,
+    act_seq_len: Optional[int] = None,
     sum_reward: bool = True,
+    truncated_reward: bool = False,
     action_scale: bool = True,
     min_action: Union[float, int, np.ndarray, list] = -1.0,
     max_action: Union[float, int, np.ndarray, list] = 1.0,
@@ -114,6 +117,7 @@ def create_env(
     :param Optional[str] obs_noise_type: parameter for observation noise wrapper.
     :param Optional[list] obs_noise_data: parameter for observation noise wrapper.
     :param Optional[int] repeat_num: parameter for action repeat wrapper.
+    :param Optional[int] act_seq_len: parameter for action sequence wrapper.
     :param bool sum_reward: parameter for action repeat wrapper.
     :param bool action_scale: parameter for scale action wrapper, default to True.
     :param Union[float, int, np.ndarray, list] min_action: minimum action after scaling.
@@ -147,9 +151,15 @@ def create_env(
             _max_episode_steps = getattr(env, "max_episode_steps")
         if _max_episode_steps is not None:
             env = TimeLimit(env, _max_episode_steps)
+        
+        if action_scale and isinstance(
+            env.action_space, (gym.spaces.Box, gymnasium.spaces.Box)):
+            env = ScaleActionData(env, min_action, max_action)
 
         if repeat_num is not None:
             env = ActionRepeatData(env, repeat_num, sum_reward)
+        if act_seq_len is not None:
+            env = ActionSeqData(env, act_seq_len, sum_reward, truncated_reward)
 
         env = ConvertType(env)
 
@@ -168,9 +178,6 @@ def create_env(
             _obs_shift = 0.0 if obs_shift is None else obs_shift
             env = ScaleObservationData(env, _obs_shift, _obs_scale)
 
-        if action_scale and isinstance(
-            env.action_space, (gym.spaces.Box, gymnasium.spaces.Box)):
-            env = ScaleActionData(env, min_action, max_action)
         
         if gym2gymnasium:
             env = Gym2Gymnasium(env)

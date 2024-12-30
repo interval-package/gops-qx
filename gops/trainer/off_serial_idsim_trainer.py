@@ -66,9 +66,12 @@ class OffSerialIdsimTrainer(OffSerialTrainer):
         self.writer.flush()
 
         # pre sampling
+        buffer_count = 0
         while self.buffer.size < kwargs["buffer_warm_size"]:
+            print('fill buffer', buffer_count)
             samples, _ = self.sampler.sample()
             self.buffer.add_batch(samples)
+            buffer_count += 1
         self.sampler_tb_dict = LogData()
 
         # create evaluation tasks

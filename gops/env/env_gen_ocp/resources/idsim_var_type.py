@@ -65,6 +65,9 @@ class Config:
     rel_v_thd: float = 1.0
     rel_v_rear_thd: float = 0.0
     time_dist: float = 2.0
+    # choose_closest: bool = True
+    # mid_line_obs: bool = True
+    # dense_ref_mode: str = "bessel"
     # Since libsumo/traci only allows a single running instance,
     # we need to use a singleton mode to avoid multiple instances.
     # The following modes are available:

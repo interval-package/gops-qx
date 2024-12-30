@@ -15,7 +15,7 @@ from gops.env.env_gen_ocp.pyth_base import (Context, ContextState, Env, State, s
 from gops.env.env_gen_ocp.resources.idsim_tags import reward_tags
 from gops.env.env_gen_ocp.resources.idsim_var_type import Config
 from gops.env.env_gen_ocp.resources.idsim_model.model_context import Parameter, BaseContext, State as ModelState
-from gops.env.env_gen_ocp.resources.idsim_model.params import ModelConfig,qianxing_config
+from gops.env.env_gen_ocp.resources.idsim_model.params import ModelConfig
 from gops.env.env_gen_ocp.resources.idsim_model.model import IdSimModel
 from gops.env.env_gen_ocp.resources.idsim_model.multilane.context import MultiLaneContext
 from gops.env.env_gen_ocp.resources.idsim_model.crossroad.context import CrossRoadContext
@@ -23,14 +23,6 @@ from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import Lasv
 import sys
 import time
 sys.path.append(str(Path(__file__).with_name("resources")))
-
-def dict_to_message(data: Dict):
-    message: str = json.dumps(data)
-    return message
-
-def message_to_dict(message: str):
-    message_dict: Dict = json.loads(message)
-    return message_dict
 
 class CloudServer:
     occupied_record_indexs = []
@@ -58,7 +50,6 @@ class CloudServer:
     def init_idsim(self, env_config: Config, model_config: ModelConfig, qx_config:dict):
         env_config_dict = asdict(env_config)
         model_config_dict = asdict(model_config)
-        # print(env_config_dict)
         env_config = Config.from_partial_dict(env_config_dict)
         model_config = ModelConfig.from_partial_dict(model_config_dict)
         self.env = LasvsimEnv(**qx_config, env_config=env_config_dict,model_config=model_config_dict) ##TODO:add the vector_env list
@@ -79,7 +70,7 @@ class CloudServer:
                                       last_action, action)
     
     def step_idsim(self, action, change_lane):
-        return self.env.step(action,change_lane)
+        return self.env.step(action, change_lane)
 
     def close_idsim(self):
         self.env.close()
@@ -111,14 +102,12 @@ class idSimEnv(Env):
     """
 
     def __init__(self, env_config: Config, model_config: ModelConfig, 
-                 scenario: str, env_idx: int=None, scenerios_list: List[str]=None,
+                 scenario: str, env_idx: int=None,
                  qx_config=None):
         self.env_idx = env_idx  
         print('env_idx:', env_idx)
         self.env_config = env_config
         self.server = CloudServer()
-        if qx_config is None:
-            qx_config=qianxing_config
         self.server.init_idsim(env_config, model_config, qx_config)
         obs_dim = self.server.model.obs_dim
         self.model_config = model_config
@@ -127,23 +116,7 @@ class idSimEnv(Env):
         self._state = None
         self._info = {"reward_comps": np.zeros(len(model_config.reward_comps), dtype=np.float32)}
         self._reward_comp_list = model_config.reward_comps
-        self.use_random_ref_param = env_config.use_multiple_path_for_multilane
-        self.random_ref_probability = env_config.random_ref_probability
-        self.random_ref_v = env_config.random_ref_v
-        self.ref_v_range = env_config.ref_v_range
         self.max_episode_steps = env_config.max_steps
-        
-        if self.use_random_ref_param > 0.0:
-            print(f'INFO: randomly choosing reference when resetting env')
-        if self.random_ref_probability > 0.0:
-            print(f'INFO: randomly choosing reference when stepping at P={self.random_ref_probability}')
-        if env_config.takeover_bias:
-            print('INFO: using takeover bias True')
-        if env_config.use_random_acc:
-            print('INFO: using random acceleration')
-        if model_config.track_closest_ref_point:
-            print('INFO: tracking closest reference point')
-
         self.lc_cooldown = self.env_config.random_ref_cooldown
         self.lc_cooldown_counter = 0
 
@@ -151,7 +124,7 @@ class idSimEnv(Env):
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
         self.context = idSimContext() # fake idsim context
         
-        self.ref_index = None
+        self.ref_index = 0
 
     def stop(self):
         self.server.stop()
@@ -159,20 +132,16 @@ class idSimEnv(Env):
     def reset(self, options:Union[dict, List[dict]]=None, **kwargs) -> Tuple[np.ndarray, dict]:
         self.lc_cooldown_counter = 0
         obs, info = self.server.reset_idsim(options=options)
-        self.ref_index = np.random.choice(
-            np.arange(self.model_config.num_ref_lines)
-        ) if self.use_random_ref_param else None
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         self._info = self._get_info(info)
         return self._get_obs(), self._info
     
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
-        # print("sample dur", time.time() - time1)
         # ----- cal the next_obs, reward -----
         self.lc_cooldown_counter += 1
         if self.lc_cooldown_counter > self.lc_cooldown:
             # lane change is allowable
-            obs, reward, terminated, truncated, info = self.server.step_idsim(action, False)
+            obs, reward, terminated, truncated, info = self.server.step_idsim(action, True)
             self.lc_cooldown_counter = 0
         else:
             obs, reward, terminated, truncated, info = self.server.step_idsim(action, False)
@@ -189,8 +158,6 @@ class idSimEnv(Env):
 
         total_reward = reward_model_free + reward
         self._info = self._get_info(info, total_reward=total_reward)
-        # if not terminated:
-        #     total_reward = np.maximum(total_reward, 0.05)
 
         obs = self._get_obs()
         self.step_render(reward=reward, mf_reward=reward_model_free)
@@ -208,8 +175,8 @@ class idSimEnv(Env):
         self.server.env._render_update_info(self._info, add_info=rw_info)
         self.server.env._render_sur_byobs()
 
-    def set_ref_index(self, ref_index: int):
-        self.ref_index = ref_index
+    # def set_ref_index(self, ref_index: int):
+    #     self.ref_index = ref_index
     
     def _get_info(self, info:dict, **kwargs) -> dict:
         info.update({
@@ -242,18 +209,14 @@ class idSimEnv(Env):
         return info
     
     def _get_obs(self) -> np.ndarray:
-        # print("ref_param shape6: ",self._state.context_state.reference)
         idsim_context = get_idsimcontext(
             State.stack([self._state.array2tensor()]), mode="full_horizon", scenario=self.scenario)
-        # print("ref_param shape2: ",idsim_context.p.ref_param.shape)
         model_obs = self.server.model.observe(idsim_context)
-        # print("final obs: ",model_obs.shape)
         return model_obs.numpy().squeeze(0)
     
     def _get_reward(self, action: np.ndarray) -> Tuple[float, Tuple]:
         cur_state = self._state.array2tensor()
         next_state = self._get_state_from_idsim(ref_index_param=self.ref_index)
-        # print("ref_param shape4: ",next_state.context_state.reference.shape)
         idsim_context = get_idsimcontext(State.stack([next_state.array2tensor()]), mode="full_horizon", scenario=self.scenario)
         action = torch.tensor(action)
         reward_details = self.server.model.reward_nn_state(
@@ -391,6 +354,5 @@ def env_creator(**kwargs):
 
     qx_config = kwargs.get("qx_config", None)
 
-    scenerios_list = kwargs["scenerios_list"] if "scenerios_list" in kwargs.keys() else None
-    env = idSimEnv(env_config, model_config, env_scenario, env_idx, scenerios_list, qx_config=qx_config)
+    env = idSimEnv(env_config, model_config, env_scenario, env_idx, qx_config=qx_config)
     return env

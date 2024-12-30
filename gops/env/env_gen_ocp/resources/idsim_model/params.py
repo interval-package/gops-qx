@@ -121,7 +121,7 @@ qianxing_config = {
         },
 }
 
-token_path = "qx.token"
+token_path = "/home/idlab/code/qx-oracle/qx.token"
 if os.path.exists(token_path):
     with open(token_path, 'r') as file:
         token_str = file.read()

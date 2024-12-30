@@ -71,7 +71,6 @@ class IdSimModel:
             [downsample_ref_point_index + i * self.model_config.num_ref_points
             for i in range(self.model_config.per_ref_feat_dim)]
         ).flatten()
-
         ref_obs = ref_obs[:, downsample_index]
 
         # boundary

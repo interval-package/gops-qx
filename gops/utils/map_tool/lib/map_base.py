@@ -48,7 +48,7 @@ class MapBase:
             self.junction2idx[junction.junction_id] = i
             self.junction_id_list.append(junction.junction_id)
 
-    def load_new(self,map_file_name):
+    def load_new(self, map_file_name):
         with open(map_file_name, "r", encoding="utf-8") as f:
             json_obj = json.load(f)
         self.map_pb = {}
@@ -89,6 +89,11 @@ class MapBase:
             self.map_pb["segments"].append(segment)
             for _, connection in enumerate(junction.get("connections", [])):
                 self.map_pb["connections"].append(connection)
+
+        # pb_obj = object()
+        # for key, val in self.map_pb.items():
+        #     setattr(pb_obj, key, val)
+        # self.map_pb = pb_obj
 
     def get_lane_by_id(self, id):
         assert id in self.lane_id_list, "lane id `{}` not in map".format(id)

@@ -41,7 +41,7 @@ if __name__ == "__main__":
     )
 
     for pidx in policy_idxs:
-        print(runner.args_list[pidx]["qianxingp_task_id"])
+        # print(runner.args_list[pidx]["qianxingp_task_id"])
         policy_name = policy[pidx].split("/")[-1]
         run_config = {
             "policy": policy_name,
@@ -56,7 +56,7 @@ if __name__ == "__main__":
         # runner.args_list[pidx]["qx_config"].update(qianxing_config)
         runner.args_list[pidx].update({
             "max_steps": 500,
-            "qx_config": None
+            "qx_config": qianxing_config
         })
 
         runner.single_run(pidx)
@@ -65,5 +65,5 @@ if __name__ == "__main__":
             path = qianxing_config["render_info"]["_debug_path_qxdata"]
             print(qianxing_config["render_info"])
             fname = f"mdl_{models[pidx]}.mp4"
-            # process_batch(path, fname)
+            process_batch(path, fname)
             gen_video_imio_mp4(path, os.path.join(path, fname))

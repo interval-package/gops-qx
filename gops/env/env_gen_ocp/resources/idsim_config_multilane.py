@@ -3,7 +3,7 @@ import numpy as np
 
 MAP_ROOT_CROSSROAD = ''
 MAP_ROOT_MULTILANE = '/root/code/idsim-scenarios/idsim-multilane-cross-dense-v20-mix-multi-size/'
-pre_horizon = 10
+pre_horizon = 30
 delta_t = 0.1
 
 env_config_param_base = {
@@ -30,14 +30,14 @@ env_config_param_base = {
     "ignore_opposite_direction": False,
     "penalize_collision": True,
     "incremental_action": True,
-    "action_lower_bound": (-4.0 * delta_t, -0.25 * delta_t),
-    "action_upper_bound": (2.5 * delta_t, 0.25 * delta_t),
-    "real_action_lower_bound": (-3.0, -0.571),
-    "real_action_upper_bound": (0.8, 0.571),
+    "action_lower_bound": (-0.25, -0.0065),
+    "action_upper_bound": (0.25, 0.0065),
+    "real_action_lower_bound": (-1.5, -0.065),
+    "real_action_upper_bound": (0.8, 0.065),
     "obs_num_surrounding_vehicles": {
-        "passenger": 5,
-        "bicycle": 0,
-        "pedestrian": 0,
+        "passenger": 8,
+        "bicycle": 2,
+        "pedestrian": 2,
     },
     "ref_v": 10.0,
     "ref_length": 48.0,
@@ -61,16 +61,16 @@ env_config_param_base = {
     # model free reward config
     "punish_sur_mode": "max",
     "enable_slow_reward": True,
-    "R_step": 10.0,
-    "P_lat": 5,
+    "R_step": 12.0,
+    "P_lat": 0.75,
     "P_long": 8.0,
-    "P_phi": 2.0,
-    "P_yaw": 1.5,
-    "P_front": 5.0*0.0,
+    "P_phi": 0.2,
+    "P_yaw": 0.15,
+    "P_front": 5.0,
     "P_side": 0.0,
-    "P_space": 15.0*0.0,
+    "P_space": 5.0,
     "P_rear": 0.0,
-    "P_steer": 0.15*0.0,
+    "P_steer": 0.15,
     "P_acc": 0.2,
     "P_delta_steer": 0.25,
     "P_jerk": 0.3,
@@ -84,6 +84,9 @@ env_config_param_base = {
     "rel_v_thd": 1.0,
     "rel_v_rear_thd": 3.0,
     "time_dist": 0.5,
+    # "choose_closest": True,
+    # "mid_line_obs": True,
+    # "dense_ref_mode": "bessel",
     # "P_yaw": 0.,
     # "P_front": 0.,
     # "P_side": 0.,
@@ -121,17 +124,17 @@ model_config_base = {
     "ego_length": 5.0,
     "ego_width": 1.8,
     "safe_dist_incremental": 1.2,
-    "downsample_ref_point_index": tuple([i for i in range(10)]),
+    "downsample_ref_point_index": tuple([0, 1, 10, 15, 20, 30]),
 
-    "num_ref_points": pre_horizon,
+    "num_ref_points": pre_horizon + 1,
     "ego_feat_dim": 7,  # vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
     "ego_bound_dim": 2,  # left, right
     "per_sur_state_dim": 6,  # x, y, phi, speed, length, width
     "per_sur_state_withinfo_dim": 7,  # x, y, phi, speed, length, width, mask
     "per_sur_feat_dim": 5,  # x, y, cos(phi), sin(phi), speed
     "per_ref_feat_dim": 5,  # x, y, cos(phi), sin(phi), speed
-    "real_action_upper": (0.8, 0.571),
-    "real_action_lower": (-3.0, -0.571),
+    "real_action_upper": (0.8, 0.065),
+    "real_action_lower": (-1.5, -0.065),
     "steer_rate_2_min": -0.2,
     "steer_rate_2_max": 0.2,
 
@@ -143,16 +146,16 @@ model_config_base = {
     "max_dist_from_ref": 1.8,
 
     "Q": (
-        0.4,
-        0.4,
-        500.0,
-        1.0,
-        2.0,
-        300.0,
+        0.0,
+        0.5,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
     ),
     "R": (
-        1.0,
-        20.0,
+        0.0,
+        0.0,
     ),
 
     "C_acc_rate_1": 0.0,
@@ -180,16 +183,16 @@ model_config_crossroad = model_config_base
 env_config_param_multilane = {
     **env_config_param_base,
     "scenario_root": MAP_ROOT_MULTILANE,
-    "action_lower_bound": (-2.5 * delta_t, -0.3 * delta_t),
-    "action_upper_bound": (2.5 * delta_t, 0.3 * delta_t),
-    "real_action_lower_bound": (-2.5, -0.6),
-    "real_action_upper_bound": (0.8, 0.6),
-    "use_random_acc": True,
-    "random_acc_cooldown": (30, 50, 50), # cooldown for acceleration, deceleration and ref_v, respectively
-    "random_acc_prob": (0.1, 0.1), # probability to accelerate and decelerate, respectively
-    "random_acc_range": (0.2, 0.8), # (m/s^2), used for acceleration
-    "random_dec_range": (-2.5, -0.5), # (m/s^2), used for deceleration
-    "prioritize_in_junction_veh": True,
+    "action_lower_bound": (-0.25, -0.0065),
+    "action_upper_bound": (0.25, 0.0065),
+    "real_action_lower_bound": (-1.5, -0.065),
+    "real_action_upper_bound": (0.8, 0.065),
+    # "use_random_acc": True,
+    # "random_acc_cooldown": (30, 50, 50), # cooldown for acceleration, deceleration and ref_v, respectively
+    # "random_acc_prob": (0.1, 0.1), # probability to accelerate and decelerate, respectively
+    # "random_acc_range": (0.2, 0.8), # (m/s^2), used for acceleration
+    # "random_dec_range": (-2.5, -0.5), # (m/s^2), used for deceleration
+    # "prioritize_in_junction_veh": True,
 }
 
 model_config_multilane = {

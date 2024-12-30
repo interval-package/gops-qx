@@ -174,7 +174,6 @@ class LasvsimEnv(gym.Env):
         self.surr_dim = 8 * self.surr_veh_num
         
 
-        # 减去3个自车位置量 其他坐标转换为以自车为原点的坐标系
         # self.obs_dim = self.ego_dim + self.ref_dim + self.surr_dim - 3
         self.obs_dim = self.ego_dim + self.ref_dim - 3
         
@@ -201,32 +200,27 @@ class LasvsimEnv(gym.Env):
         self.scenario_id = self.scenario_list[0]
         self.ref_index = 0
 
-        # _render_init函数；重构代码，在不需要 render 时节约计算资源
         self._render_init(render_info=render_info)
 
         # Print Basic info
-        print(f"task id: {task_id}\n", token)
-        print("scenario", self.scenario_list)
+        # print(f"task id: {task_id}\n", token)
+        # print("scenario", self.scenario_list)
 
   
     def step(self, action: np.ndarray,flag):
         self.step_counter += 1
-        #绝对动作-->增量动作  ； 动作映射 归一化-->物理含义
         action = self.inverse_normalize_action(action)
         self.action = self.last_action + action
-        # print("action incre: ",action)
-        # print("action1: ",self.action)
 
         self.action = np.clip(self.action, self.real_action_lower, self.real_action_upper)
-        # print("action2: ",self.action)
 
-        # local dynamic rollout
-        import torch
-        from gops.env.env_gen_ocp.resources.idsim_model.model import ego_predict_model
-        if self.step_counter == 1:
-            self._debug_dyn_state =  ego_predict_model(torch.from_numpy(self._state), torch.tensor([self.action[0], self.action[1]]), 0.1, (1800, 3058, 1.5756, 1.5756, -206369, -206369, 300, 0))
-        else: 
-            self._debug_dyn_state =  ego_predict_model(self._debug_dyn_state, torch.tensor([self.action[0], self.action[1]]), 0.1, (1800, 3058, 1.5, 1.5, -206369, -206369, 300, 0))
+        # # local dynamic rollout
+        # import torch
+        # from gops.env.env_gen_ocp.resources.idsim_model.model import ego_predict_model
+        # if self.step_counter == 1:
+        #     self._debug_dyn_state =  ego_predict_model(torch.from_numpy(self._state), torch.tensor([self.action[0], self.action[1]]), 0.1, (1800, 3058, 1.5756, 1.5756, -206369, -206369, 300, 0))
+        # else: 
+        #     self._debug_dyn_state =  ego_predict_model(self._debug_dyn_state, torch.tensor([self.action[0], self.action[1]]), 0.1, (1800, 3058, 1.5, 1.5, -206369, -206369, 300, 0))
             
         self.vehicleControleReult = self.stub.SetVehicleControlInfo(
             trainsim_pb2.SetVehicleControlInfoReq(
@@ -257,20 +251,13 @@ class LasvsimEnv(gym.Env):
         self.update_ref_points(flag)
         self.update_neighbor_state()
 
-        # print("self u: ",self._state[2])
-        # print("reward function multi: ",reward)
-        # print("reward function multi info : ",rew_info)
-        # self._buffered_reward = (reward, rew_info)
-        # print("reward 2: ",reward)
-        # print("reward2 info : ",rew_info)
-        # print("step4: ",time.time()-time4)
-        # print("total time: ",time.time()-time0)
-
         reward, rew_info = self.reward_function_multilane()
         info = {**rew_info,**self.info}
         self.last_action  = self.action
 
-        return self.get_obs(), reward, self.judge_done(), self.judge_done(),  info
+        # obs = self.get_obs()
+        obs = np.zeros_like(self.observation_space.low)
+        return obs, reward, self.judge_done(), self.judge_done(),  info
 
     def stop(self):
         self.resetResp = self.stub.Stop(
@@ -460,7 +447,7 @@ class LasvsimEnv(gym.Env):
                 "_debug_path_qxdata": _debug_path_qxdata,
                 "show_npc": render_info["show_npc"],
                 "draw_bound": render_info["draw_bound"],
-                "map": _map,
+                # "map": _map,
                 "render_type": render_info["type"], # pic type
                 "render_config": render_info,
             })
@@ -529,7 +516,7 @@ class LasvsimEnv(gym.Env):
             _debug_adaptive_vars,
 
             # Dynamic test
-            self._debug_dyn_state.numpy()
+            # self._debug_dyn_state.numpy()
         )
         
         append_to_pickle_incremental(os.path.join(self._render_cfg._debug_path_qxdata, "trajs.pkl"), obj)
@@ -583,13 +570,13 @@ class LasvsimEnv(gym.Env):
         text_objs = []
         for text_str, text_loc in zip(text_strs, text_locs):
             text_obj = f.text(
-                text_loc[0], text_loc[1],  # 位置
+                text_loc[0], text_loc[1],  
                 text_str,
-                fontsize=10,  # 字体大小
-                fontweight='bold',  # 黑体字
-                ha='right',  # 水平对齐方式
-                va='top',  # 垂直对齐方式
-                color= color  # 字体颜色
+                fontsize=10,  
+                fontweight='bold',  
+                ha='right',  # 
+                va='top',  # 
+                color= color  # 
             )
             text_objs.append(text_obj)
         
@@ -653,53 +640,11 @@ class LasvsimEnv(gym.Env):
                 i.remove()
         return
 
-    ### finish render
-
-    def _get_nominal_steer_by_state(self, 
-                                    ego_state,
-                                    ref_param,
-                                    ref_index,
-                                    ):
-        # ref_param: [ R, 2N+1, 4]
-        # use ref_index to select ref_param, remove R
-        # use ref_state_index to determine the start, from 2N+1 to 3
-        # ref_line: [3, 4]
-        def cal_curvature(x1, y1, x2, y2, x3, y3):
-            # cal curvature by three points in batch format
-            # dim of x1 is [1]
-            a = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-            b = np.sqrt((x3 - x2) ** 2 + (y3 - y2) ** 2)
-            c = np.sqrt((x3 - x1) ** 2 + (y3 - y1) ** 2)
-            k = 0
-            i = (a * b * c) != 0
-            if i:
-                area = x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)
-                k = 2 * area / (a * b * c)
-            # area > 0 for left turn, area < 0 for right turn
-            # area = x1[i] * (y2[i] - y3[i]) + x2[i] * \
-            #     (y3[i] - y1[i]) + x3[i] * (y1[i] - y2[i])
-            # k[i] = 2 * area / (a[i] * b[i] * c[i])
-            return k
-        ref_line = np.stack([
-            ref_param[ref_index, i, :] for i in [0, 5, 10]])
-        ref_x_ego_coord, ref_y_ego_coord, ref_phi_ego_coord = \
-            convert_ref_to_ego_coord(
-                ref_line[ :, :3], ego_state)  # [N+1]
-        # nominal action
-        x1, y1 = ref_x_ego_coord[0], ref_y_ego_coord[0]  # [B,]
-        x2, y2 = ref_x_ego_coord[1], ref_y_ego_coord[1]
-        x3, y3 = ref_x_ego_coord[2], ref_y_ego_coord[2]
-        nominal_curvature = cal_curvature(x1, y1, x2, y2, x3, y3)
-        nominal_steer = nominal_curvature * 2.65  # FIXME: hard-coded: wheel base
-        nominal_steer = np.clip(
-            nominal_steer, self.config['real_action_lower_bound'][1], self.config['real_action_upper_bound'][1])
-        return nominal_steer
-
     def model_free_reward(self,
                             context, # S_t
                             last_last_action, # absolute action, A_{t-2}
                             last_action, # absolute action, A_{t-1}
-                            action # normalized incremental action, （A_t - A_{t-1}） / Z
+                            action # normalized incremental action, _t - A_{t-1} / Z
                             ) -> Tuple[float, dict]:
         # all inputs are batched
         # vehicle state: context.x.ego_state
@@ -1189,35 +1134,35 @@ class LasvsimEnv(gym.Env):
         return 10
         # TODO u should be a list, change this func reference.
 
-    def update_ref_points_origin(self):
-        '''
-        return: [ref_x, ref_y, ref_phi, ref_u] * (pre_horizon + 1)
-        '''
-        # TODO: Confirm the time interval of trajectory points in lasvsim.
-        vehicle = self.stub.GetVehicle(
-            trainsim_pb2.GetVehicleReq(
-                simulation_id=self.startResp.simulation_id,
-                vehicle_id=self.ego_id
-            ),
-            metadata=self.metadata
-        )
-        # TODO ref_u
-        ref_u = 5
-        if vehicle.vehicle.info.static_path == []:
-            ref_x = vehicle.vehicle.info.moving_info.position.point.x
-            ref_y = vehicle.vehicle.info.moving_info.position.point.y
-            ref_phi = vehicle.vehicle.info.moving_info.position.phi
-            ref_points = [[ref_x, ref_y, ref_phi, ref_u]] * (self.pre_horizon + 1)
-        else:
-            ref_points = []
-            for i in range(self.pre_horizon + 1):
-                ref_x = vehicle.vehicle.info.static_path[0].point[i].x
-                ref_dx = vehicle.vehicle.info.static_path[0].point[i + 1].x
-                ref_y = vehicle.vehicle.info.static_path[0].point[i].y
-                ref_dy = vehicle.vehicle.info.static_path[0].point[i + 1].y
-                ref_phi = self.compute_phi(ref_x, ref_dx, ref_y, ref_dy)
-                ref_points.append([ref_x, ref_y, ref_phi, ref_u])
-        self._ref_points = np.array(ref_points, dtype=np.float32)
+    # def update_ref_points_origin(self):
+    #     '''
+    #     return: [ref_x, ref_y, ref_phi, ref_u] * (pre_horizon + 1)
+    #     '''
+    #     # TODO: Confirm the time interval of trajectory points in lasvsim.
+    #     vehicle = self.stub.GetVehicle(
+    #         trainsim_pb2.GetVehicleReq(
+    #             simulation_id=self.startResp.simulation_id,
+    #             vehicle_id=self.ego_id
+    #         ),
+    #         metadata=self.metadata
+    #     )
+    #     # TODO ref_u
+    #     ref_u = 5
+    #     if vehicle.vehicle.info.static_path == []:
+    #         ref_x = vehicle.vehicle.info.moving_info.position.point.x
+    #         ref_y = vehicle.vehicle.info.moving_info.position.point.y
+    #         ref_phi = vehicle.vehicle.info.moving_info.position.phi
+    #         ref_points = [[ref_x, ref_y, ref_phi, ref_u]] * (self.pre_horizon + 1)
+    #     else:
+    #         ref_points = []
+    #         for i in range(self.pre_horizon + 1):
+    #             ref_x = vehicle.vehicle.info.static_path[0].point[i].x
+    #             ref_dx = vehicle.vehicle.info.static_path[0].point[i + 1].x
+    #             ref_y = vehicle.vehicle.info.static_path[0].point[i].y
+    #             ref_dy = vehicle.vehicle.info.static_path[0].point[i + 1].y
+    #             ref_phi = self.compute_phi(ref_x, ref_dx, ref_y, ref_dy)
+    #             ref_points.append([ref_x, ref_y, ref_phi, ref_u])
+    #     self._ref_points = np.array(ref_points, dtype=np.float32)
 
     
     def update_neighbor_state(self):
@@ -1235,7 +1180,16 @@ class LasvsimEnv(gym.Env):
             idx = np.argpartition(arr, k)
             return idx[:k]
 
-        # TODO: 感知获取
+        def coordinate_transformation(x_0, y_0, phi_0, x, y, phi):
+            x_0 = float(x_0)
+            y_0 = float(y_0)
+            phi_0 = float(phi_0)
+            x_ = (x - float(x_0)) * np.cos(float(phi_0)) + (y - float(y_0)) * np.sin(float(phi_0))
+            y_ = -(x - x_0) * np.sin(phi_0) + (y - y_0) * np.cos(phi_0)
+            phi_ = phi - phi_0
+            return np.stack((x_, y_, phi_), axis=-1)
+
+        # TODO: 鎰熺煡鑾峰彇
 
         perception_info = self.stub.GetVehiclePerceptionInfo(
             trainsim_pb2.GetVehiclePerceptionInfoReq(
@@ -1275,16 +1229,22 @@ class LasvsimEnv(gym.Env):
             for i in indices:
                 if np.abs(self.state[0] - around_moving_objs[i].position.point.x) > 0.001 or np.abs(self.state[1] - around_moving_objs[i].position.point.y) > 0.001:
                     # Caution: The idx 0 of around is ignored due to the nearset car currently is the car itself
-                    __add_info(around_moving_objs[i].position.point.x)
-                    __add_info(around_moving_objs[i].position.point.y)
-                    __add_info(around_moving_objs[i].position.phi)
-                    __add_info(around_moving_objs[i].moving_info.u)
-                    # __add_info(vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).v)
-                    # __add_info(vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).w)
-                    __add_info(around_moving_objs[i].base_info.length)
-                    __add_info(around_moving_objs[i].base_info.width)
-                    __add_info(1) # mask, 1 indicate the real car and the 0 indicate the virtual one
-                    neighbor_info.append(around_moving_objs[i].position.lane_id)
+                    sur_x, sur_y, sur_phi = around_moving_objs[i].position.point.x, \
+                        around_moving_objs[i].position.point.y, \
+                        around_moving_objs[i].position.phi
+                    rel_x, rel_y, rel_phi = coordinate_transformation(self._ego[0], self._ego[1], self._ego[2], 
+                                                                      sur_x, sur_y, sur_phi)
+                    if rel_phi < np.pi/2:
+                        __add_info(around_moving_objs[i].position.point.x)
+                        __add_info(around_moving_objs[i].position.point.y)
+                        __add_info(around_moving_objs[i].position.phi)
+                        __add_info(around_moving_objs[i].moving_info.u)
+                        # __add_info(vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).v)
+                        # __add_info(vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).w)
+                        __add_info(around_moving_objs[i].base_info.length)
+                        __add_info(around_moving_objs[i].base_info.width)
+                        __add_info(1) # mask, 1 indicate the real car and the 0 indicate the virtual one
+                        neighbor_info.append(around_moving_objs[i].position.lane_id)
 
             # append 0 if the number of neighbor vehicles is less than 5
             if (len(neighbor_info) < self.surr_dim):
@@ -1417,7 +1377,7 @@ class LasvsimEnv(gym.Env):
                 indices = range(len(distances))
             # append info of the nearest k distance vehicles
             for i in indices:
-                # 添加一些障碍物状态数据
+                # 濞ｈ濮炴稉鈧禍娑㈡绾板秶澧块悩鑸碘偓浣规殶閹癸拷
                 obs_state = input_data.obs.obs_state.add()
                 obs_state.x = vehicles_position.position_dict.get(around_moving_objs[i]).point.x
                 obs_state.y = vehicles_position.position_dict.get(around_moving_objs[i]).point.y
@@ -1456,7 +1416,7 @@ class LasvsimEnv(gym.Env):
         direction_list = []
         assert len(link_route) > 0, "link_route is empty"
         for i in range(len(link_route) - 1):
-            # 获取当前link的所有下游link
+            # 閼惧嘲褰囪ぐ鎾冲link閻ㄥ嫭澧嶉張澶夌瑓濞撶珮ink
             next_link_list = self.get_next_link(link_route[i])
             if link_route[i + 1] in next_link_list:
                 direction_list.append(self.get_link_direction(link_route[i]))
@@ -1515,14 +1475,14 @@ class LasvsimEnv(gym.Env):
         for i in range(len(lane_path) - 1):
             lane_path_phi.append(math.atan2(lane_path[i + 1].y - lane_path[i].y, lane_path[i + 1].x - lane_path[i].x))
         lane_path_phi = np.array(lane_path_phi)
-        # 计算航向角变化，考虑越过 ±π 的情况
+        # 鐠侊紕鐣婚懜顏勬倻鐟欐帒褰夐崠鏍电礉閼板啳妾荤搾濠呯箖 鍗よ熀 閻ㄥ嫭鍎忛崘锟�
         delta_phi = np.diff(lane_path_phi)
-        delta_phi = (delta_phi + np.pi) % (2 * np.pi) - np.pi  # 将角度差归一化到 [-π, π]
+        delta_phi = (delta_phi + np.pi) % (2 * np.pi) - np.pi  # 鐏忓棜顫楁惔锕€妯婅ぐ鎺嶇閸栨牕鍩� [-锜�, 锜篯
 
-        # 计算累计的航向角变化
+        # 鐠侊紕鐣荤槐顖濐吀閻ㄥ嫯鍩呴崥鎴ｎ潡閸欐ê瀵�
         cumulative_phi_change = np.sum(delta_phi)
 
-        # 判断累计变化量
+        # 閸掋倖鏌囩槐顖濐吀閸欐ê瀵查柌锟�
         if cumulative_phi_change > np.radians(30):
             return "left"
         elif cumulative_phi_change < np.radians(-30):
@@ -1546,29 +1506,16 @@ class LasvsimEnv(gym.Env):
         return connection_id_list
 
     def convert_coordinates(self, x, y, source_origin, target_origin, angle):
-        """
-        转换平面坐标从源坐标系到目标坐标系
 
-        参数：
-        x: 输入坐标的 x 分量
-        y: 输入坐标的 y 分量
-        source_origin: 源坐标系的原点坐标 (x0, y0)
-        target_origin: 目标坐标系的原点坐标 (x0', y0')
-        angle: 源坐标系与目标坐标系之间的旋转角度（弧度）
 
-        返回值：
-        转换后的坐标 (x', y')
-        """
 
-        # 计算相对于源坐标系原点的坐标偏移
+        # 鐠侊紕鐣婚惄绋款嚠娴滃孩绨崸鎰垼缁甯悙鍦畱閸ф劖鐖ｉ崑蹇曅�
         relative_x = x - source_origin[0]
         relative_y = y - source_origin[1]
 
-        # 应用旋转变换
         rotated_x = relative_x * math.cos(angle) - relative_y * math.sin(angle)
         rotated_y = relative_x * math.sin(angle) + relative_y * math.cos(angle)
 
-        # 计算相对于目标坐标系原点的坐标
         target_x = rotated_x + target_origin[0]
         target_y = rotated_y + target_origin[1]
 
