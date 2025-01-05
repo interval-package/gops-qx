@@ -25,7 +25,7 @@ from gops.utils.common_utils import ModuleOnDevice
 from gops.utils.parallel_task_manager import TaskPool
 from gops.utils.tensorboard_setup import add_scalars, tb_tags
 from gops.utils.log_data import LogData
-from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import timeit
+from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import timeit
 
 class OffSerialTrainer:
     def __init__(self, alg, sampler, buffer, evaluator, **kwargs):

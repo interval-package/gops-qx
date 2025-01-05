@@ -36,8 +36,8 @@ env_config_param_base = {
     "real_action_upper_bound": (0.8, 0.065),
     "obs_num_surrounding_vehicles": {
         "passenger": 8,
-        "bicycle": 2,
-        "pedestrian": 2,
+        "bicycle": 0,
+        "pedestrian": 0,
     },
     "ref_v": 10.0,
     "ref_length": 48.0,
@@ -118,7 +118,7 @@ model_config_base = {
     "v_discount_in_junction_straight": 0.75,
     "v_discount_in_junction_left_turn": 0.5,
     "v_discount_in_junction_right_turn": 0.375,
-    "num_ref_lines": 1,
+    "num_ref_lines": 3,
     "dec_before_junction_green": 0.8,
     "dec_before_junction_red": 1.3,
     "ego_length": 5.0,
@@ -303,7 +303,6 @@ def cal_idsim_pi_paras(
     ref_dim = env_model_config["per_ref_feat_dim"]
     num_ref_points = len(env_model_config["downsample_ref_point_index"]) 
     num_objs = int(sum(i for i in env_config["obs_num_surrounding_vehicles"].values()))
-
     pi_paras = {}
     pi_paras["pi_begin"] = ego_dim + ref_dim*num_ref_points
     pi_paras["pi_end"] = pi_paras["pi_begin"] + sur_dim*num_objs 

@@ -8,8 +8,8 @@ from gops.env.env_gen_ocp.resources.idsim_model.params import ModelConfig, ego_m
 
 from gops.env.env_gen_ocp.resources.idsim_model.crossroad.ref import get_ref_param
 from gops.env.env_gen_ocp.resources.idsim_model.crossroad.sur import get_sur_param
-from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import LasvsimEnv
-from gops.env.env_gen_ocp.resources.idsim_model.crossroad.sur import get_sur_param,predict_sur
+from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import LasvsimEnv
+from gops.env.env_gen_ocp.resources.idsim_model.crossroad.sur import get_sur_param, predict_sur
 
 
 def get_traffic_light_param(model_config: ModelConfig) -> np.ndarray:

@@ -16,15 +16,6 @@ from gops.env.env_gen_ocp.pyth_idsim import idSimEnv, get_idsimcontext
 from gops.env.env_gen_ocp.resources.idsim_var_type import Config
 from gops.env.env_gen_ocp.resources.idsim_model.params import ModelConfig
 
-# from idsim.config import Config
-# from idsim.envs.env import CrossRoad
-# from idsim_model.model import IdSimModel
-# from idsim_model.model_context import Parameter, BaseContext
-# from idsim_model.crossroad.context import CrossRoadContext
-# from idsim_model.multilane.context import MultiLaneContext
-# from idsim_model.model_context import State as ModelState
-# from idsim_model.params import ModelConfig
-
 
 class TrajectoryProcessor:
     def __init__(self, dense_ref_mode: str, dense_ref_param: Optional[Any] = None):
@@ -182,8 +173,8 @@ class TrajectoryProcessor:
 
 class idSimEnvPlanning(idSimEnv):
     def __init__(self, env_config: Config, model_config: ModelConfig, 
-                 scenario: str, rou_config: Dict[str, Any]=None, env_idx: int=None, scenerios_list: List[str]=None):
-        super(idSimEnvPlanning, self).__init__(env_config, model_config, scenario, rou_config, env_idx, scenerios_list)
+                 scenario: str, env_idx: int=None, qx_config=None):
+        super(idSimEnvPlanning, self).__init__(env_config, model_config, scenario, env_idx, qx_config)
 
         self.ref_vocabulary = None
         self.planning_horizon = 0
@@ -198,9 +189,8 @@ class idSimEnvPlanning(idSimEnv):
         self.begin_planning = True
         self.planning_horizon = 0
             
-    # @cal_ave_exec_time(print_interval=1000)
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
-        _, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
+        obs, reward, terminated, truncated, info = self.server.step_idsim(action) # lasvsim
 
         # ----- set ref_index to the middle lane to calculate obs -----
         mid_index = self._state.context_state.reference.shape[0] // 2
@@ -254,7 +244,7 @@ class idSimEnvPlanning(idSimEnv):
             scenario=self.scenario
         )
 
-        reward, info = self.model_free_reward_batch(
+        reward, info = self.server.env.model_free_reward_multilane_batch(
             context=idsim_context,
             last_last_action=state.robot_state[..., -4:-2][None, :], # absolute action
             last_action=state.robot_state[..., -2:][None, :], # absolute action
@@ -286,5 +276,5 @@ def env_creator(**kwargs):
 
     qx_config = kwargs.get("qx_config", None)
 
-    env = idSimEnv(env_config, model_config, env_scenario, env_idx, qx_config=qx_config)
+    env = idSimEnvPlanning(env_config, model_config, env_scenario, env_idx, qx_config=qx_config)
     return env

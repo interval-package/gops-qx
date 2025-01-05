@@ -1,4 +1,4 @@
-from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import LasvsimEnv
+from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import LasvsimEnv
 import numpy as np
 import time
 kwargs = {

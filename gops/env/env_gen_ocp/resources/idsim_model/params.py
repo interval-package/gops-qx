@@ -1,7 +1,7 @@
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 from omegaconf import OmegaConf
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 
 @dataclass(frozen=False)
@@ -22,9 +22,8 @@ class ModelConfig():
     v_discount_in_junction_straight: float = 0.75
     v_discount_in_junction_left_turn: float = 0.5
     v_discount_in_junction_right_turn: float = 0.5
-    num_ref_lines: int = 1
-    # obs ref中需要的参考点索引
-    downsample_ref_point_index: Tuple[int] = tuple([i for i in range(10)])
+    num_ref_lines: int = 3
+    downsample_ref_point_index: Tuple[int] = tuple([i for i in range(31)])
     filter_num: int = 0  # only for extra filter
     ahead_lane_length_min: float = 6.0
     ahead_lane_length_max: float = 60.0
@@ -79,6 +78,30 @@ class ModelConfig():
     reward_scale: float = 0.01
     reward_comps: Tuple[str] = ()
 
+    critic_dict: Dict[str, Any] = field(default_factory=lambda: {
+        "sur_reward": [
+            "env_scaled_reward_done",
+            "env_scaled_reward_collision",
+            "env_scaled_reward_collision_risk",
+            "env_scaled_reward_boundary"
+        ],
+        "ego_reward": [
+            "env_scaled_reward_step",
+            "env_scaled_reward_vel_long",
+            "env_scaled_reward_steering",
+            "env_scaled_reward_acc_long",
+            "env_scaled_reward_delta_steer",
+            "env_scaled_reward_jerk",
+            "env_scaled_reward_nominal_acc",
+            "env_scaled_reward_overspeed",
+        ],
+        "tracking_reward": [
+            "env_scaled_reward_dist_lat",
+            "env_scaled_reward_head_ang",
+            "env_scaled_reward_yaw_rate"
+        ]
+    })
+
     @staticmethod
     def from_partial_dict(partial_dict) -> "ModelConfig":
         base = OmegaConf.structured(ModelConfig)
@@ -86,8 +109,8 @@ class ModelConfig():
         return OmegaConf.to_object(merged)
 
 model_config = {
-    "N": 10,
-    "num_ref_points": 10,
+    "N": 30,
+    "num_ref_points": 31,
     "ego_feat_dim": 7, # vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
     "add_boundary_obs": False,
     "ego_bound_dim": 2, # left, right

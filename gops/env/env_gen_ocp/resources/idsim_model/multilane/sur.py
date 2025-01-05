@@ -3,68 +3,77 @@ import torch
 from typing import List, Dict, Tuple
 
 # from idsim.envs.env import CrossRoad
-from gops.env.env_gen_ocp.pyth_base import Env as CrossRoad
+# from gops.env.env_gen_ocp.pyth_base import Env as CrossRoad
+from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import LasvsimEnv, SurroundingVehicle
 from gops.env.env_gen_ocp.resources.idsim_model.utils.numpy_utils import pad_with_mask
 from gops.env.env_gen_ocp.resources.idsim_model.params import ModelConfig, sur_noise_dict
 
 
-def remove_irrelevant_vehicle(surrounding,
-                              vehicle,
-                              network):
-    # Keep vehicles in:
-    # 1. the same route
-    # 2. upcoming/current junction (junction's internal edges)
-    # 3. upcoming/current junction's incoming edges
-    if vehicle.edge == vehicle.route[-1] and not vehicle.in_junction:
-        # The second condition excludes an edge case where the vehicle drives
-        # back to the junction after leaving it, same as in navigation module.
-        return [s for s in surrounding if s.road_id == vehicle.edge]
+# def remove_irrelevant_vehicle(surrounding,
+#                               vehicle,
+#                               network):
+#     # Keep vehicles in:
+#     # 1. the same route
+#     # 2. upcoming/current junction (junction's internal edges)
+#     # 3. upcoming/current junction's incoming edges
+#     if vehicle.edge == vehicle.route[-1] and not vehicle.in_junction:
+#         # The second condition excludes an edge case where the vehicle drives
+#         # back to the junction after leaving it, same as in navigation module.
+#         return [s for s in surrounding if s.road_id == vehicle.edge]
 
-    if vehicle.in_junction:
-        junction_id, _ = network.get_junction_by_edge_hint(
-            vehicle.ego_polygon, vehicle.edge)
-    else:
-        junction_id = network.get_upcoming_junction(vehicle.edge)
-    incoming_edges = network.get_junction_incoming_edges(junction_id)
-    allowed_edges = incoming_edges + vehicle.route
-    return [s for s in surrounding if (s.road_id in allowed_edges or network.is_edge_internal(s.road_id))]
+#     if vehicle.in_junction:
+#         junction_id, _ = network.get_junction_by_edge_hint(
+#             vehicle.ego_polygon, vehicle.edge)
+#     else:
+#         junction_id = network.get_upcoming_junction(vehicle.edge)
+#     incoming_edges = network.get_junction_incoming_edges(junction_id)
+#     allowed_edges = incoming_edges + vehicle.route
+#     return [s for s in surrounding if (s.road_id in allowed_edges or network.is_edge_internal(s.road_id))]
 
 
-def get_sur_state(env: CrossRoad,
+def get_sur_state(env: LasvsimEnv,
                   model_config: ModelConfig,
                   rng: np.random.Generator) -> np.ndarray:
     per_sur_state_dim = model_config.per_sur_state_dim
-    ego_state = env.engine.context.vehicle.state
+    # ego_state = env.engine.context.vehicle.state
     padding_veh_shape = np.array(model_config.padding_veh_shape, dtype=np.float32)
     padding_bike_shape = np.array(model_config.padding_bike_shape, dtype=np.float32)
     padding_ped_shape = np.array(model_config.padding_ped_shape, dtype=np.float32)
-    num_veh = env.config.obs_num_surrounding_vehicles['passenger']
-    num_bike = env.config.obs_num_surrounding_vehicles['bicycle']
-    num_ped = env.config.obs_num_surrounding_vehicles['pedestrian']
-    sur_info = env.engine.context.vehicle.surrounding_veh_info
+    num_veh = env.config["obs_num_surrounding_vehicles"]['passenger']
+    num_bike = env.config["obs_num_surrounding_vehicles"]['bicycle']
+    num_ped = env.config["obs_num_surrounding_vehicles"]['pedestrian']
+    # sur_info = env.engine.context.vehicle.surrounding_veh_info
+
+    ego = env.lasvsim_context.ego
+    ego_state = ego.state
+    sur_info = env.lasvsim_context.sur_list
     # sur_info = [s for s in sur_info if s.rel_x > 0.]
-    if env.config.ignore_opposite_direction and not env.engine.context.vehicle.in_junction:
-        ego_edge = env.engine.context.vehicle.edge
-        sur_info = [s for s in sur_info if s.road_id == ego_edge]
+    # if env.config.ignore_opposite_direction and not ego.in_junction:
+    #     ego_edge = env.engine.context.vehicle.edge
+    #     sur_info = [s for s in sur_info if s.road_id == ego_edge]
 
     # split the surrounding vehicles into three types
-    sur_veh_info = [s for s in sur_info if s.type.startswith('v')]
-    sur_bike_info = [s for s in sur_info if s.type == 'b1']
-    sur_ped_info = [s for s in sur_info if s.type == 'DEFAULT_PEDTYPE']
+    # sur_veh_info = [s for s in sur_info if s.type.startswith('v')]
+    # sur_bike_info = [s for s in sur_info if s.type == 'b1']
+    # sur_ped_info = [s for s in sur_info if s.type == 'DEFAULT_PEDTYPE']
+    sur_veh_info = sur_info
+    sur_bike_info = []
+    sur_ped_info = []
 
     # only choose the M closest vehicles
     sur_veh_state = construct_state(
         model_config, sur_veh_info, num_veh, per_sur_state_dim, ego_state, padding_veh_shape, sur_noise_dict['passenger'], rng)
-    sur_bike_state = construct_state(
-        model_config, sur_bike_info, num_bike, per_sur_state_dim, ego_state, padding_bike_shape, sur_noise_dict['bicycle'], rng)
-    sur_ped_state = construct_state(
-        model_config, sur_ped_info, num_ped, per_sur_state_dim, ego_state, padding_ped_shape, sur_noise_dict['pedestrian'], rng)
-    sur_state_withinfo = np.concatenate(
-        (sur_veh_state, sur_bike_state, sur_ped_state), axis=0)
+    # sur_bike_state = construct_state(
+    #     model_config, sur_bike_info, num_bike, per_sur_state_dim, ego_state, padding_bike_shape, sur_noise_dict['bicycle'], rng)
+    # sur_ped_state = construct_state(
+    #     model_config, sur_ped_info, num_ped, per_sur_state_dim, ego_state, padding_ped_shape, sur_noise_dict['pedestrian'], rng)
+    # sur_state_withinfo = np.concatenate(
+    #     (sur_veh_state, sur_bike_state, sur_ped_state), axis=0)
+    sur_state_withinfo = sur_veh_state
     return sur_state_withinfo
 
 
-def get_sur_param(env: CrossRoad,
+def get_sur_param(env: LasvsimEnv,
                   model_config: ModelConfig,
                   rng: np.random.Generator) -> np.ndarray:
     # (M, per_sur_state_withinfo_dim)
@@ -77,7 +86,7 @@ def get_sur_param(env: CrossRoad,
         (2*N+1, M, per_sur_state_withinfo_dim), dtype=np.float32)
     sur_param[0] = sur_state_withinfo
     for i in range(1, 2*N+1):
-        sur_param[i] = sur_predict_model(sur_param[i-1], env.config.dt)
+        sur_param[i] = sur_predict_model(sur_param[i-1], env.config["dt"])
     return sur_param
 
 def predict_sur(sur_state,model_config):
@@ -94,7 +103,7 @@ def predict_sur(sur_state,model_config):
 
 
 def construct_state(model_config: ModelConfig,
-                    sur_info,
+                    sur_info: List[SurroundingVehicle],
                     M: int,
                     per_sur_state_dim: int,
                     ego_state : np.ndarray,
@@ -102,8 +111,8 @@ def construct_state(model_config: ModelConfig,
                     noise_dict: Dict[str, np.ndarray],
                     rng: np.random.Generator) -> np.ndarray:
     sur_obs_padding = model_config.sur_obs_padding
-    sur_info.sort(key='distance')
-    sur_state = [(s.x, s.y, s.phi, s.speed, s.length, s.width)
+    # sur_info.sort(key='distance')
+    sur_state = [(s.x, s.y, s.phi, s.u, s.length, s.width)
                  for s in sur_info[:M]]
     
     # sur_state = [(s.x, s.y, s.phi, s.speed,

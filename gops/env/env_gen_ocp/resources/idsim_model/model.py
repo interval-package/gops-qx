@@ -22,7 +22,6 @@ from gops.env.env_gen_ocp.resources.idsim_model.params import ModelConfig
 class IdSimModel:
     def __init__(self, env_config: Config, model_config: ModelConfig):
         # action bounds
-        # todo 映射上下限 增量上下限及物理绝对值上下限
         self.action_lower_bound = torch.tensor(env_config.action_lower_bound)
         self.action_upper_bound = torch.tensor(env_config.action_upper_bound)
         self.action_center = (self.action_upper_bound + self.action_lower_bound) / 2
@@ -33,21 +32,16 @@ class IdSimModel:
             model_config.real_action_lower, dtype=torch.float32)
 
         self.Ts = env_config.dt
-        # 动力学模型参数
         self.vehicle_spec = env_config.vehicle_spec
-        # 直道参考速度
         self.ref_v = model_config.ref_v_lane
         self.N = model_config.N
-        # todo env config 和qianxing config合并统一
         obs_num_surr_dict = env_config.obs_num_surrounding_vehicles
         self.M = obs_num_surr_dict['passenger'] + \
                  obs_num_surr_dict['bicycle'] + obs_num_surr_dict['pedestrian']
         self.model_config: ModelConfig = model_config
-        # obs以model为准
         self.obs_dim = self.get_obs_dim()
 
     def get_obs_dim(self):
-        # “+3” ： 长，宽，mask
         obs_dim = self.model_config.ego_feat_dim + \
             (self.model_config.per_sur_feat_dim + 3) * self.M + \
             self.model_config.per_ref_feat_dim * len(self.model_config.downsample_ref_point_index)
@@ -61,25 +55,22 @@ class IdSimModel:
             sur_obs = get_sur_obs(context, self.N + 1)
         else:
             sur_obs = get_sur_obs(context, 1)
-
+        # multi_ref_obs = get_ref_obs(context, self.model_config.num_ref_points, self.model_config.num_ref_lines)
         multi_ref_obs = get_ref_obs_frenet_coord(context, self.model_config.num_ref_points, self.model_config.num_ref_lines)
         ref_index = context.p.ref_index_param
         ref_obs = select_ref_by_index(multi_ref_obs, ref_index)
         downsample_ref_point_index = torch.tensor(self.model_config.downsample_ref_point_index)
-
         downsample_index = torch.stack(
             [downsample_ref_point_index + i * self.model_config.num_ref_points
             for i in range(self.model_config.per_ref_feat_dim)]
         ).flatten()
         ref_obs = ref_obs[:, downsample_index]
-
         # boundary
         if self.model_config.add_boundary_obs:
             bound_obs = context.p.boundary_param
             obs = torch.cat((ego_obs, ref_obs, sur_obs, bound_obs), dim=-1)
         else:
             obs = torch.cat((ego_obs, ref_obs, sur_obs), dim=-1)
-
         return obs
 
     def dynamics(self, context: BaseContext, action: torch.Tensor) -> State:
@@ -125,8 +116,8 @@ class IdSimModel:
                         last_action: torch.Tensor,  # last_action of state
                         action: torch.Tensor  # (normalized) action of state
                         ):
-        ego_state = context.x.ego_state  # [B, 6] # x, y, phi,vx, vy,r
-        ego_x, ego_y, ego_phi,ego_vx, ego_vy, ego_r = ego_state.unbind(dim=-1) # [B,]
+        ego_state = context.x.ego_state  # [B, 6] # x, y, vx, vy, phi, r
+        ego_x, ego_y, ego_vx, ego_vy, ego_phi, ego_r = ego_state.unbind(dim=-1) # [B,]
         B = ego_state.shape[0]  # scalar
         ref_param = context.p.ref_param  # [B, R, 2N+1, 4] # x, y, phi, speed
         # [B, 2*N+1, M, 7] # x, y, phi, speed, length, width, mask
@@ -144,10 +135,7 @@ class IdSimModel:
             else:
                 ref_state_index = context.i * torch.ones_like(ego_x, dtype=torch.int)   # [B,]
         ref_state = ref_param[torch.arange(B), ref_index_param, ref_state_index, :]  # [B, 4]
-        # print("1: ",ref_state_index)
-        # print("2: ",ref_state_index.shape)
-        # print("3: ", ref_state)
-        # print("4: ", ref_state.shape)
+
         # nominal action
         if self.model_config.use_nominal_action:
             nominal_acc = self._get_nominal_acc_by_state(ref_param, ref_index_param, context.p.light_param, ref_state_index)
@@ -155,11 +143,6 @@ class IdSimModel:
         else:
             nominal_acc = 0
             nominal_steer = 0
-
-        # print("shape11: ", ego_state.shape)
-        # print("shape22: ", ref_state.shape)
-        # print("shape33: ", sur_state.shape)
-
         return self.get_reward_by_state(ego_state, ref_state, sur_state,
                                         last_last_action, last_action, action, action_real,
                                         nominal_acc, nominal_steer, onref_mask, context)
@@ -256,7 +239,7 @@ class IdSimModel:
                             ):
         model_config = deepcopy(self.model_config)
         # ego
-        ego_x, ego_y, ego_phi,ego_vx, ego_vy,ego_r = ego_state.unbind(dim=-1) # [B,]
+        ego_x, ego_y, ego_vx, ego_vy, ego_phi, ego_r = ego_state.unbind(dim=-1) # [B,]
         # ref
         ref_x, ref_y, ref_phi = ref_state[:, :3].unbind(dim=-1)
         # ref_x_ego_coord, ref_y_ego_coord, ref_phi_ego_coord = \
@@ -270,7 +253,7 @@ class IdSimModel:
         cost_tracking_lon = square_loss(ref_x_ego_coord)
         cost_tracking_lat = square_loss(ref_y_ego_coord)
         cost_tracking_vx = square_loss(ref_state[:, -1] - ego_vx)
-        cost_tracking_vy = square_loss(ego_state[:, 4])
+        cost_tracking_vy = square_loss(ego_state[:, 3])
         cost_tracking_phi = square_loss(ref_phi_ego_coord)
         cost_tracking_yaw_rate = square_loss(ego_state[:, 5])
 
@@ -469,7 +452,7 @@ class IdSimModel:
         # use ref_index to select ref_param, remove R
         # use ref_state_index to determine the start, from 2N+1 to 3
         # ref_line: [B, 3, 4]
-        ref_state_index = torch.tensor([0])
+
         ref_line = torch.stack([
             ref_param[torch.arange(ref_param.shape[0]),
             ref_index, ref_state_index+i, :] for i in [0, 5, 10]], dim=1)
@@ -492,8 +475,6 @@ class IdSimModel:
                                   light_param: torch.Tensor,
                                   ref_state_index: torch.Tensor,
                                   ) -> torch.Tensor:
-
-        ref_state_index = torch.tensor([0])
         ref_vx_0 = ref_param[torch.arange(ref_param.shape[0]),
             ref_index, ref_state_index, 3]
         ref_vx_1 = ref_param[torch.arange(ref_param.shape[0]),

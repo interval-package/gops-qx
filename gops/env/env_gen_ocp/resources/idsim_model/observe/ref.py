@@ -68,37 +68,16 @@ def get_ref_obs_frenet_coord(context: BaseContext, num_ref_points, num_ref_lines
     # frenet coordinate, transform_ego_to_ref_coord
     ego_state = context.x.ego_state
     ref_param = context.p.ref_param
-    # print("ref param: ",ref_param.shape)
-    # print("ego param: ",ego_state.shape)
-    # if ref_param.shape[0]>1:
-    #     ref_param = ref_param[0].unsqueeze(0)
-    # if ego_state.shape[0]>1:
-    #     ego_state = ego_state[0].unsqueeze(0)
-    # print("ref param2: ",ref_param.shape)
-    # print("iiiii:  ",context.i)
-    # print("num refpoint:  ",num_ref_points)
-    # context.i = torch.tensor(0).int()
-    # print("context.i : ",context.i)
     multi_ref_obs_absolute = ref_param[:, :, context.i:context.i + num_ref_points]
-    # print("ref param3: ",multi_ref_obs_absolute.shape)
-
     multi_ref_obs = []
-    # print("num_ref_lines: ",num_ref_lines)
     for i in range(num_ref_lines):
         ref_obs_absolute = multi_ref_obs_absolute[:, i, :, :3]
-        # print("ref param4: ", ref_obs_absolute.shape)
-
         ref_x_ego_coord, ref_y_ego_coord, ref_phi_ego_coord = convert_ego_to_ref_coord(ref_obs_absolute, ego_state)  # frenet coordinate
         vx = ego_state[:, 2].unsqueeze(-1)
         ref_vx = multi_ref_obs_absolute[:, i, :, -1]
         vx_error = vx - ref_vx  # frenet coordinate
         ref_obs = torch.concat((ref_x_ego_coord, ref_y_ego_coord,
                                 torch.cos(ref_phi_ego_coord), torch.sin(ref_phi_ego_coord), vx_error), axis=-1)
-        # print("reffff : ",ref_x_ego_coord,ref_y_ego_coord,vx_error)
-        # print("ref obssss: ",ref_obs)
         multi_ref_obs.append(ref_obs)
-    # [B, R, d]   (x,y,cos,sin,du)
-    # print("multishape1: ",len(multi_ref_obs))
-    # print("multi: ",multi_ref_obs[0].shape)
-
+    # [B, R, d]
     return torch.stack(multi_ref_obs, dim=1)

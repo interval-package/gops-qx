@@ -3,14 +3,9 @@ from dataclasses import asdict
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Generic, Optional, Tuple, Union
-from typing_extensions import Self
-
 import gym
 import numpy as np
 import torch
-import grpc
-import json
-import pickle
 from gops.env.env_gen_ocp.pyth_base import (Context, ContextState, Env, State, stateType)
 from gops.env.env_gen_ocp.resources.idsim_tags import reward_tags
 from gops.env.env_gen_ocp.resources.idsim_var_type import Config
@@ -18,10 +13,10 @@ from gops.env.env_gen_ocp.resources.idsim_model.model_context import Parameter, 
 from gops.env.env_gen_ocp.resources.idsim_model.params import ModelConfig
 from gops.env.env_gen_ocp.resources.idsim_model.model import IdSimModel
 from gops.env.env_gen_ocp.resources.idsim_model.multilane.context import MultiLaneContext
-from gops.env.env_gen_ocp.resources.idsim_model.crossroad.context import CrossRoadContext
-from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import LasvsimEnv, timeit
+# from gops.env.env_gen_ocp.resources.idsim_model.crossroad.context import CrossRoadContext
+from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import LasvsimEnv
+# from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import LasvsimEnv
 import sys
-import time
 sys.path.append(str(Path(__file__).with_name("resources")))
 
 class CloudServer:
@@ -56,24 +51,24 @@ class CloudServer:
         self.model = IdSimModel(env_config, model_config)
 
     def reset_idsim(self, options: List[dict] = None):
-        return self.env.reset(expect_direction="straight", options=options)
+        return self.env.reset()
         
     def get_multilane_idsimcontext(self, model_config, ref_index_param, handle=0):
-        return MultiLaneContext.from_env(self.env, self.model.model_config, ref_index_param)
+        return MultiLaneContext.from_env(self.env, model_config, ref_index_param)
 
-    def get_crossroad_idsimcontext(self, model_config: ModelConfig, ref_index_param, handle=0):
-        return CrossRoadContext.from_env(self.env, self.model.model_config, ref_index_param)
+    # def get_crossroad_idsimcontext(self, model_config: ModelConfig, ref_index_param, handle=0):
+    #     return CrossRoadContext.from_env(self.env, model_config, ref_index_param)
     
     def get_model_free_reward_details(self, idsim_context: BaseContext, last_last_action, 
                                       last_action, action, handle=0):
-        return self.env.model_free_reward(idsim_context, last_last_action, 
+        return self.env.model_free_reward_multilane_batch(idsim_context, last_last_action, 
                                       last_action, action)
     
-    def step_idsim(self, action, change_lane):
-        return self.env.step(action, change_lane)
+    def step_idsim(self, action):
+        return self.env.step(action)
 
     def close_idsim(self):
-        self.env.close()
+        self.env.stop_remote_lasvsim()
 
 @dataclass
 class idSimContextState(ContextState[stateType], Generic[stateType]):
@@ -114,17 +109,23 @@ class idSimEnv(Env):
         self.scenario = scenario
 
         self._state = None
-        self._info = {"reward_comps": np.zeros(len(model_config.reward_comps), dtype=np.float32)}
+        self._info = {"critic_comps": np.zeros(len(model_config.critic_dict), dtype=np.float32)}
+        self.critic_dict = model_config.critic_dict
+        self._info.update({"reward_comps": np.zeros(len(model_config.reward_comps), dtype=np.float32)}) 
         self._reward_comp_list = model_config.reward_comps
         self.max_episode_steps = env_config.max_steps
-        self.lc_cooldown = self.env_config.random_ref_cooldown
-        self.lc_cooldown_counter = 0
 
         self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
         self.context = idSimContext() # fake idsim context
+        self.ref_index = 1
+
         
-        self.ref_index = 0
+        self.choose_closest = self.env_config.choose_closest
+        self.mid_line_obs = self.env_config.mid_line_obs
+        self.begin_planning = True
+        self.cum_reward = None
+        self.cum_critic_comps = None
 
     def stop(self):
         self.server.stop()
@@ -132,41 +133,78 @@ class idSimEnv(Env):
     def reset(self, options:Union[dict, List[dict]]=None, **kwargs) -> Tuple[np.ndarray, dict]:
         self.lc_cooldown_counter = 0
         obs, info = self.server.reset_idsim(options=options)
+        
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
+        if self.mid_line_obs:
+            self.ref_index = self._state.context_state.reference.shape[0] // 2
+
         self._info = self._get_info(info)
+
+        self.begin_planning = True
         return self._get_obs(), self._info
     
-    def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
-        # ----- cal the next_obs, reward -----
-        self.lc_cooldown_counter += 1
-        if self.lc_cooldown_counter > self.lc_cooldown:
-            # lane change is allowable
-            obs, reward, terminated, truncated, info = self.server.step_idsim(action, True)
-            self.lc_cooldown_counter = 0
-        else:
-            obs, reward, terminated, truncated, info = self.server.step_idsim(action, False)
-        _, reward_details, next_state = self._get_reward(action)
-        self._state = next_state
-        reward_model_free, mf_info = self._get_model_free_reward(action)
-        info.update(mf_info)
-        info["reward_details"] = dict(
-            zip(reward_tags, [i.item() for i in reward_details])
+    # def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
+    #     # # ----- cal the next_obs, reward -----
+    #     # self.lc_cooldown_counter += 1
+    #     # if self.lc_cooldown_counter > self.lc_cooldown:
+    #     #     # lane change is allowable
+    #     #     obs, reward, terminated, truncated, info = self.server.step_idsim(action)
+    #     #     self.lc_cooldown_counter = 0
+    #     # else:
+    #     #     obs, reward, terminated, truncated, info = self.server.step_idsim(action)
+    #     obs, reward, terminated, truncated, info = self.server.step_idsim(action)
+        
+    #     # ----- choose closest lane to calculate reward -----
+    #     if self.choose_closest:
+    #         self.ref_index = closest_ref_index = self.choose_closest_lane()
+    #         self._state = self._get_state_from_idsim(ref_index_param=closest_ref_index)
+        
+
+
+    #     # ----- initialize cumulative reward at beginning of planning -----
+    #     if self.begin_planning:
+    #         self.begin_planning = False
+    #         self.cum_reward = 0.0
+    #         self.cum_critic_comps = np.zeros(len(self.critic_dict), dtype=np.float32)
+    #     _, reward_details, _ = self._get_reward(action)
+    #     reward_model_free, mf_info = self._get_model_free_reward(action)
+    #     info.update(mf_info[-1])
+
+    #     # ----- get cumulated reward and critic components -----
+    #     critic_comps = self.get_critic_comps(info)
+    #     self.cum_critic_comps += critic_comps
+    #     self.cum_reward += (reward + reward_model_free[-1])
+
+    #     # ----- update info -----
+    #     info["reward_details"] = dict(
+    #         zip(reward_tags, [i.item() for i in reward_details])
+    #     )
+    #     done = terminated or truncated
+    #     if truncated:
+    #         info["TimeLimit.truncated"] = True # for gym
+
+    #     self._info = self._get_info(info)
+    #     # TODO: check the other keys in info
+    #     self._info["critic_comps"] = self.cum_critic_comps
+    #     self.step_render(reward=reward, mf_reward=reward_model_free)
+    #     # if not terminated:
+    #     #     total_reward = np.maximum(total_reward, 0.05)
+
+    #     # ----- set ref_index to the middle lane to calculate obs -----
+    #     if self.mid_line_obs:
+    #         mid_index = self._state.context_state.reference.shape[0] // 2
+    #         self._state = self._get_state_from_idsim(ref_index_param=mid_index) # get state using mid_index to calculate obs
+    #     return self._get_obs(), self.cum_reward, done, self._info
+
+    def choose_closest_lane(self):
+        # set self.ref_index to the closest lane according to self._state.context_state.reference and self._state.robot_state
+        closest_ref_index = np.argmin(
+            np.linalg.norm(
+                self._state.robot_state[:2] - self._state.context_state.reference[:, 0, :2], axis=1
+            )
         )
-        done = terminated or truncated
-        if truncated:
-            info["TimeLimit.truncated"] = True # for gym
-
-        total_reward = reward_model_free + reward
-        self._info = self._get_info(info, total_reward=total_reward)
-
-        obs = self._get_obs()
-        self.step_render(reward=reward, mf_reward=reward_model_free)
-        # print("reward 1 ", reward_model_free)
-        # print("reward 1 info:",mf_info)
-        # print("reward total: ",total_reward)
-        # print("step dur: ",time.time() - time1)
-        return obs, total_reward, done, self._info
-
+        return closest_ref_index
+    
     def step_render(self, reward=None, mf_reward=None):
         rw_info = {
             # "reward": reward,
@@ -175,13 +213,13 @@ class idSimEnv(Env):
         self.server.env._render_update_info(self._info, add_info=rw_info)
         self.server.env._render_sur_byobs()
 
-    # def set_ref_index(self, ref_index: int):
-    #     self.ref_index = ref_index
-    
+    def get_critic_comps(self, info: dict) -> np.ndarray:
+        return np.array([sum(info[reward_type] for reward_type in critic_type) for critic_type in self.critic_dict.values()], dtype=np.float32)
+
     def _get_info(self, info:dict, **kwargs) -> dict:
         info.update({
             "reward_comps":{
-                "shape":(len(self._reward_comp_list),), 
+                "shape":(len(self.model_config.critic_dict),), 
                 "dtype":np.float32
             }
         })
@@ -189,9 +227,11 @@ class idSimEnv(Env):
         if "env_reward_step" in info.keys():
             info["reward_comps"] = np.array([info[i] for i in self._reward_comp_list], dtype=np.float32)
         else:
-            info["reward_comps"] = np.zeros(len(self._reward_comp_list), dtype=np.float32)
+            info["reward_comps"] = np.zeros(len(self.model_config.critic_dict), dtype=np.float32)
         if "total_reward" in kwargs.keys():
             info["total_reward"] = kwargs["total_reward"]
+        info.update({"critic_comps": np.zeros(len(self.model_config.critic_dict), dtype=np.float32)})
+
         return info
     
     @property
@@ -201,8 +241,8 @@ class idSimEnv(Env):
             return {}
         info = super().additional_info
         info.update({
-            "reward_comps":{
-                "shape":(len(self._reward_comp_list),), 
+            "critic_comps":{
+                "shape":(len(self.critic_dict),), 
                 "dtype":np.float32
             }
         })
@@ -244,9 +284,9 @@ class idSimEnv(Env):
         ...
     
     def _get_state_from_idsim(self, ref_index_param=None) -> State:
-        if self.scenario == "crossroad":
-            idsim_context = self.server.get_crossroad_idsimcontext(self.model_config, ref_index_param)
-        elif self.scenario == "multilane":
+        # if self.scenario == "crossroad":
+        #     idsim_context = self.server.get_crossroad_idsimcontext(self.model_config, ref_index_param)
+        if self.scenario == "multilane":
             idsim_context = self.server.get_multilane_idsimcontext(self.model_config, ref_index_param)
         else:
             raise NotImplementedError
@@ -300,7 +340,7 @@ def get_idsimcontext(state: State, mode: str, scenario: str) -> BaseContext:
                 sur_param = state.context_state.constraint,
                 light_param = state.context_state.light_param,
                 ref_index_param = state.context_state.ref_index_param,
-                boundary_param=state.context_state.boundary_param
+                boundary_param=state.context_state.boundary_param,
             ),
             t = state.context_state.real_t,
             i = state.context_state.t[0]

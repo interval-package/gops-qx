@@ -4,19 +4,20 @@ from typing import Dict, List, Tuple
 # from idsim.lib import point_project_to_line, compute_waypoints_by_intervals
 from gops.env.env_gen_ocp.resources.lib import point_project_to_line, compute_waypoints_by_intervals
 # from idsim.envs.env import CrossRoad
-from gops.env.env_gen_ocp.pyth_base import Env as CrossRoad
+# from gops.env.env_gen_ocp.pyth_base import Env as CrossRoad
+from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import LasvsimEnv
 from gops.env.env_gen_ocp.resources.idsim_model.params import ModelConfig
 
 
-def get_ref_param(env: CrossRoad, model_config: ModelConfig, light_param: np.ndarray) -> np.ndarray:
+def get_ref_param(env: LasvsimEnv, model_config: ModelConfig, light_param: np.ndarray) -> np.ndarray:
     # [num_ref_lines, num_ref_points+N, per_point_dim]
     N = model_config.N
     num_ref_lines = model_config.num_ref_lines
     num_ref_points = model_config.num_ref_points
-    ref_list = env.engine.context.vehicle.reference_list
-    ref_info_list = env.engine.context.vehicle.reference_info_list
+    ref_list = env.lasvsim_context.ref_list
+    # ref_info_list = env.engine.context.vehicle.reference_info_list
     ref_v_lane = model_config.ref_v_lane
-    dt = env.config.dt
+    dt = env.config["dt"]
 
     traffic_light = light_param[0, 0]
     path_planning_mode = "green"
@@ -28,7 +29,7 @@ def get_ref_param(env: CrossRoad, model_config: ModelConfig, light_param: np.nda
         path_planning_mode = "red"
         min_ahead_lane_length = model_config.ahead_lane_length_min
     
-    driving_task = env.engine.context.vehicle.direction.lower()
+    driving_task = "s"
     if driving_task == "s":
         ref_v_junction = ref_v_lane * model_config.v_discount_in_junction_straight
     elif driving_task == "l":
@@ -38,23 +39,51 @@ def get_ref_param(env: CrossRoad, model_config: ModelConfig, light_param: np.nda
     else:
         raise ValueError("Error driving task: {}".format(driving_task))
     
-    if env.engine.context.ref_acc is not None:
-        cur_v = ref_v_lane + env.engine.context.ref_acc * env.engine.context.acc_time * dt
-        cur_v = np.clip(cur_v, a_min=0, a_max=ref_v_lane+10) # TODO: remove this
-    else:
-        cur_v = ref_v_lane
+    # if env.engine.context.ref_acc is not None:
+    #     cur_v = ref_v_lane + env.engine.context.ref_acc * env.engine.context.acc_time * dt
+    #     cur_v = np.clip(cur_v, a_min=0, a_max=ref_v_lane+10) # TODO: remove this
+    # else:
+    #     cur_v = ref_v_lane
+    cur_v = ref_v_lane
 
     ref_param = []
     for ref_line in ref_list:
-        ref_info = ref_info_list[ref_list.index(ref_line)]
+        # ref_info = ref_info_list[ref_list.index(ref_line)]
+        # current_part = ref_info[0]
+        # position_on_ref = point_project_to_line(
+        #     ref_line, *env.engine.context.vehicle.ground_position)
+        
+        # if current_part['destination'] == True:
+        #     ref_info = ref_info_list[ref_list.index(ref_line)]
+        #     position_on_ref = point_project_to_line(ref_line, *env.engine.context.vehicle.ground_position)
+        #     intervals, ref_v = compute_intervals(ref_info, num_ref_points + N -1, cur_v, ref_v_lane, dt, env.engine.context.ref_acc, )
+        # elif current_part['destination'] == False and current_part["in_junction"] == True:
+        #     intervals, ref_v = compute_intervals_in_junction(
+        #         num_ref_points + N - 1, ref_v_junction, dt)
+        # elif current_part["in_junction"] == False and current_part['destination'] == False:
+        #     if path_planning_mode == "green":
+        #         intervals, ref_v = compute_intervals_initsegment_green(
+        #             position_on_ref, current_part, num_ref_points + N - 1, ref_v_lane, ref_v_junction, dt, am)
+        #     elif path_planning_mode == "red":
+        #         intervals, ref_v = compute_intervals_initsegment_red(
+        #             position_on_ref, current_part, num_ref_points + N - 1, ref_v_lane, dt, am, min_ahead_lane_length)
+        #     else:
+        #         raise ValueError("Error path_planning_mode")
+        # else:
+        #     raise ValueError("Error ref_line")
+        
+        # ref_info = ref_info_list[ref_list.index(ref_line)]
+        ref_info = [
+            {'destination': True}
+        ]
         current_part = ref_info[0]
+        ego = env.lasvsim_context.ego
         position_on_ref = point_project_to_line(
-            ref_line, *env.engine.context.vehicle.ground_position)
+            ref_line, *ego.ground_position)
         
         if current_part['destination'] == True:
-            ref_info = ref_info_list[ref_list.index(ref_line)]
-            position_on_ref = point_project_to_line(ref_line, *env.engine.context.vehicle.ground_position)
-            intervals, ref_v = compute_intervals(ref_info, num_ref_points + N -1, cur_v, ref_v_lane, dt, env.engine.context.ref_acc, )
+            position_on_ref = point_project_to_line(ref_line, *ego.ground_position)
+            intervals, ref_v = compute_intervals(ref_info, num_ref_points + N -1, cur_v, ref_v_lane, dt, 0)
         elif current_part['destination'] == False and current_part["in_junction"] == True:
             intervals, ref_v = compute_intervals_in_junction(
                 num_ref_points + N - 1, ref_v_junction, dt)
@@ -82,7 +111,7 @@ def get_ref_param(env: CrossRoad, model_config: ModelConfig, light_param: np.nda
     return np.array(ref_param)
 
 
-def update_ref_param(env: CrossRoad,
+def update_ref_param(env: LasvsimEnv,
                      ref_param: np.ndarray,
                      light_param: np.ndarray,
                      model_config: ModelConfig) -> np.ndarray:

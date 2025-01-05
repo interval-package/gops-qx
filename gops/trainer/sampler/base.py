@@ -23,7 +23,7 @@ from gops.env.vector.vector_env import VectorEnv
 from gops.utils.common_utils import set_seed
 from gops.utils.explore_noise import GaussNoise, EpsilonGreedy
 from gops.utils.tensorboard_setup import tb_tags
-from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import timeit
+# from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import timeit
 
 
 class Experience(NamedTuple):
@@ -84,7 +84,7 @@ class BaseSampler(metaclass=ABCMeta):
     def load_state_dict(self, state_dict):
         self.networks.load_state_dict(state_dict)
         
-    @timeit
+    # @timeit
     def sample(self) -> Tuple[Union[List[Experience], dict], dict]:
         self.total_sample_number += self.sample_batch_size
         tb_info = dict()

@@ -1,18 +1,14 @@
 import random
 from typing import Any, Dict, Tuple, List
-from gops.env.env_gen_ocp.resources import idc_pb2
 import gym
 import numpy as np
 from gym.utils import seeding
 import time,math
 import grpc
-import torch
 import time, os
 import functools
 from shapely.geometry import Point, LineString, Polygon
 from gops.utils.math_utils import deal_with_phi_rad, convert_ref_to_ego_coord
-# from gops.utils.map_tool.idc_maploader import MapBase
-# from gops.utils.map_tool.idc_static_planner import IDCStaticPlanner
 import matplotlib.pyplot as plt
 from gops.utils.map_tool.utils import path_discrete_t_new
 from gops.env.env_gen_ocp.resources.lib import point_project_to_line, compute_waypoint
@@ -323,8 +319,6 @@ class LasvsimEnv(gym.Env):
                 )
                 if (test_vehicle is  not None) :
                     test_vehicle_list = test_vehicle.list
-                    # print("sce id2: ",self.scenario_id)
-                # print("sce id2: ",test_vehicle.list)
                 self.init_env(self.scenario_list[idx])
             self.scenario_cnt = 0
         
@@ -706,10 +700,6 @@ class LasvsimEnv(gym.Env):
         scaled_punish_head_ang = punish_head_ang * self.config['P_phi']
         scaled_punish_yaw_rate = punish_yaw_rate * self.config['P_yaw']
 
-        # reward related to action
-        # nominal_steer = self._get_nominal_steer_by_state(
-        #     ego_state, ref_param, ref_index)*180/np.pi * 0.0
-        # print(f'nominal_steer: {nominal_steer}')
         nominal_steer = 0.0
 
         abs_steer = np.abs(last_steer- nominal_steer)   
@@ -1018,9 +1008,9 @@ class LasvsimEnv(gym.Env):
             "env_scaled_punish_boundary": scaled_punish_boundary, #scaled_punish_boundary,
         }
 
-    def get_constraint(self) -> np.ndarray:
-        # TODO: implement this, get constraint from self.stub
-        return np.random.uniform(low=-1, high=1, size=(1,))
+    # def get_constraint(self) -> np.ndarray:
+    #     # TODO: implement this, get constraint from self.stub
+    #     return np.random.uniform(low=-1, high=1, size=(1,))
 
     def judge_done(self) -> bool:
     
@@ -1054,10 +1044,6 @@ class LasvsimEnv(gym.Env):
         return done
     
     def update_state(self):
-        '''
-        return: [x, y, phi, u, v, w]
-        '''
-
         vehicles_id_list = [self.ego_id]
 
         vehicles_position = self.stub.GetVehiclePosition(
@@ -1126,44 +1112,10 @@ class LasvsimEnv(gym.Env):
                 ref_phi = ref_path_discrete[2][i]
                 ref_u = ref_path_discrete[3][i]
                 ref_points.append([ref_x, ref_y, ref_phi, ref_u])
-            self._ref_points = np.array(ref_points, dtype=np.float32)
-            # print("ref points: ",self._ref_points[0],self._ref_points[1],self._ref_points[2])
-
+            self._ref_points = np.array(ref_points, dtype=np.float32) # [2*self.pre_horizon + 1, 4]
 
     def _clac_ref_u(self, refpoints):
         return 10
-        # TODO u should be a list, change this func reference.
-
-    # def update_ref_points_origin(self):
-    #     '''
-    #     return: [ref_x, ref_y, ref_phi, ref_u] * (pre_horizon + 1)
-    #     '''
-    #     # TODO: Confirm the time interval of trajectory points in lasvsim.
-    #     vehicle = self.stub.GetVehicle(
-    #         trainsim_pb2.GetVehicleReq(
-    #             simulation_id=self.startResp.simulation_id,
-    #             vehicle_id=self.ego_id
-    #         ),
-    #         metadata=self.metadata
-    #     )
-    #     # TODO ref_u
-    #     ref_u = 5
-    #     if vehicle.vehicle.info.static_path == []:
-    #         ref_x = vehicle.vehicle.info.moving_info.position.point.x
-    #         ref_y = vehicle.vehicle.info.moving_info.position.point.y
-    #         ref_phi = vehicle.vehicle.info.moving_info.position.phi
-    #         ref_points = [[ref_x, ref_y, ref_phi, ref_u]] * (self.pre_horizon + 1)
-    #     else:
-    #         ref_points = []
-    #         for i in range(self.pre_horizon + 1):
-    #             ref_x = vehicle.vehicle.info.static_path[0].point[i].x
-    #             ref_dx = vehicle.vehicle.info.static_path[0].point[i + 1].x
-    #             ref_y = vehicle.vehicle.info.static_path[0].point[i].y
-    #             ref_dy = vehicle.vehicle.info.static_path[0].point[i + 1].y
-    #             ref_phi = self.compute_phi(ref_x, ref_dx, ref_y, ref_dy)
-    #             ref_points.append([ref_x, ref_y, ref_phi, ref_u])
-    #     self._ref_points = np.array(ref_points, dtype=np.float32)
-
     
     def update_neighbor_state(self):
         '''
@@ -1202,58 +1154,55 @@ class LasvsimEnv(gym.Env):
 
         self._render_parse_surcar(around_moving_objs)
 
-        # print("perception res: ",around_moving_objs)
-
         # Preprocess the data of neighbor vehicles
-        if (self.b_surr):
-            if len(around_moving_objs) > 0:
-                n = len(around_moving_objs)
-                for i in range(n):
-                    dist = CalDist(around_moving_objs[i].position.point.x,
-                                   around_moving_objs[i].position.point.y,
-                                   self._state[0],
-                                   self._state[1])
-                    distances.append(dist)
 
-            # sort out the smallest k distance vehicles
-            if (len(distances) > self.surr_veh_num):
-                indices = get_indices_of_k_smallest(distances, self.surr_veh_num)
-            else:
-                indices = range(len(distances))
+        if len(around_moving_objs) > 0:
+            n = len(around_moving_objs)
+            for i in range(n):
+                dist = CalDist(around_moving_objs[i].position.point.x,
+                                around_moving_objs[i].position.point.y,
+                                self._state[0],
+                                self._state[1])
+                distances.append(dist)
 
-            def __add_info(val):
-                val = float(val)
-                neighbor_info.append(val)
+        # sort out the smallest k distance vehicles
+        if (len(distances) > self.surr_veh_num):
+            indices = get_indices_of_k_smallest(distances, self.surr_veh_num)
+        else:
+            indices = range(len(distances))
 
-            # append info of the smallest k distance vehicles
-            for i in indices:
-                if np.abs(self.state[0] - around_moving_objs[i].position.point.x) > 0.001 or np.abs(self.state[1] - around_moving_objs[i].position.point.y) > 0.001:
-                    # Caution: The idx 0 of around is ignored due to the nearset car currently is the car itself
-                    sur_x, sur_y, sur_phi = around_moving_objs[i].position.point.x, \
-                        around_moving_objs[i].position.point.y, \
-                        around_moving_objs[i].position.phi
-                    rel_x, rel_y, rel_phi = coordinate_transformation(self._ego[0], self._ego[1], self._ego[2], 
-                                                                      sur_x, sur_y, sur_phi)
-                    if rel_phi < np.pi/2:
-                        __add_info(around_moving_objs[i].position.point.x)
-                        __add_info(around_moving_objs[i].position.point.y)
-                        __add_info(around_moving_objs[i].position.phi)
-                        __add_info(around_moving_objs[i].moving_info.u)
-                        # __add_info(vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).v)
-                        # __add_info(vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).w)
-                        __add_info(around_moving_objs[i].base_info.length)
-                        __add_info(around_moving_objs[i].base_info.width)
-                        __add_info(1) # mask, 1 indicate the real car and the 0 indicate the virtual one
-                        neighbor_info.append(around_moving_objs[i].position.lane_id)
+        def __add_info(val):
+            val = float(val)
+            neighbor_info.append(val)
 
-            # append 0 if the number of neighbor vehicles is less than 5
-            if (len(neighbor_info) < self.surr_dim):
-                neighbor_info.extend([0]*(self.surr_dim-len(neighbor_info)))
+        # append info of the smallest k distance vehicles
+        for i in indices:
+            if np.abs(self.state[0] - around_moving_objs[i].position.point.x) > 0.001 or np.abs(self.state[1] - around_moving_objs[i].position.point.y) > 0.001:
+                # Caution: The idx 0 of around is ignored due to the nearset car currently is the car itself
+                sur_x, sur_y, sur_phi = around_moving_objs[i].position.point.x, \
+                    around_moving_objs[i].position.point.y, \
+                    around_moving_objs[i].position.phi
+                rel_x, rel_y, rel_phi = coordinate_transformation(self._ego[0], self._ego[1], self._ego[2], 
+                                                                    sur_x, sur_y, sur_phi)
+                if rel_phi < np.pi/2:
+                    __add_info(around_moving_objs[i].position.point.x)
+                    __add_info(around_moving_objs[i].position.point.y)
+                    __add_info(around_moving_objs[i].position.phi)
+                    __add_info(around_moving_objs[i].moving_info.u)
+                    # __add_info(vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).v)
+                    # __add_info(vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).w)
+                    __add_info(around_moving_objs[i].base_info.length)
+                    __add_info(around_moving_objs[i].base_info.width)
+                    __add_info(1) # mask, 1 indicate the real car and the 0 indicate the virtual one
+                    neighbor_info.append(around_moving_objs[i].position.lane_id)
+
+        # append 0 if the number of neighbor vehicles is less than 5
+        if (len(neighbor_info) < self.surr_dim):
+            neighbor_info.extend([0]*(self.surr_dim-len(neighbor_info)))
 
         self._neighbor_vehicle = np.array(neighbor_info).reshape(-1, 8)
 
         self._neighbor_state = self._neighbor_vehicle[:,:7]
-        #print("update35: ",time.time()-time35)
 
     @property
     def state(self) -> np.ndarray:
@@ -1267,142 +1216,11 @@ class LasvsimEnv(gym.Env):
     def neighbor_state(self) -> np.ndarray:
         return self._neighbor_state
 
-    @property
-    def info(self) -> Dict:
-        return {
-            "state": self._state,
-            "constraint": self.get_constraint(),
-            # "ref_path": self.xy_points,
-        }
 
-    @property
-    def additional_info(self) -> Dict[str, Dict]:
-        return self.info_dict
-
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
-        return [seed]
-
-    def check_error(self, err):
-        if err is None:
-            return False
-
-        if err.code != 0:
-            print(err.msg)
-            return True
-        return False
 
     def __del__(self):
         self.insecure_channel.__exit__(None, None, None)
 
-    def fill_protobuf_data(self,input_data):
-
-        def CalDist(x1, y1, x2, y2):
-            return ((x1-x2)**2+(y1-y2)**2)**0.5
-        def id_to_numbers(id_string):
-            numbers = []
-            for char in id_string:
-                if char.isdigit():  # Check if the character is a digit
-                    numbers.append(char)
-                elif char.isalpha():  # Check if the character is a letter
-                    number = ord(char.lower()) - ord('a') + 1  # Convert letter to number
-                    numbers.extend(list(str(number)))  # Extend the list with the digits of the number
-                else:
-                    continue  # Skip other characters
-            return np.int64(''.join(numbers))
-
-        def obstacle_type_to_int(obstacle_type_str):
-            mapping = {'vehicle': 0, 'bike': 1, 'pedestrian': 2}
-            return mapping.get(obstacle_type_str.lower(), -1)
-
-        # get the indices of the smallest k elements
-        def get_indices_of_k_smallest(arr, k):
-            idx = np.argpartition(arr, k)
-            return idx[:k]
-        distances = []
-
-        vehicles_id = self.stub.GetVehicleIdList(
-            trainsim_pb2.GetVehicleIdListReq(
-                simulation_id=self.startResp.simulation_id, 
-            ),
-            metadata=self.metadata
-        )
-        vehicles_id_list = list(vehicles_id.list)[:100]
-        if self.ego_id not in vehicles_id_list:
-            vehicles_id_list[-1] = self.ego_id
-
-        vehicles_position = self.stub.GetVehiclePosition(
-            trainsim_pb2.GetVehiclePositionReq(
-                simulation_id=self.startResp.simulation_id, 
-                id_list=vehicles_id_list
-            ), 
-            metadata=self.metadata
-        )
-
-        vehicles_baseInfo = self.stub.GetVehicleBaseInfo(
-            trainsim_pb2.GetVehicleBaseInfoReq(
-                simulation_id=self.startResp.simulation_id, 
-                id_list=vehicles_id_list
-            ), 
-            metadata=self.metadata
-        )
-
-        vehicles_MovingInfo = self.stub.GetVehicleMovingInfo(
-            trainsim_pb2.GetVehicleMovingInfoReq(
-                simulation_id=self.startResp.simulation_id, 
-                id_list=vehicles_id_list
-            ), 
-            metadata=self.metadata
-        )
-        around_moving_objs = [id for id in vehicles_id_list if id != self.ego_id]
-
-        # Preprocess the data of neighbor vehicles
-        if (self.b_surr):
-            if around_moving_objs == []:
-                pass
-            else:
-                n = len(around_moving_objs)
-                for i in range(n):
-                    dist = CalDist(vehicles_position.position_dict.get(around_moving_objs[i]).point.x,
-                                   vehicles_position.position_dict.get(around_moving_objs[i]).point.y, 
-                                   vehicles_position.position_dict.get(self.ego_id).point.x,
-                                   vehicles_position.position_dict.get(self.ego_id).point.y)
-                    distances.append(dist)            
-                # end_time = time.time()  # Start the timer
-                # print(f'the for loop spend time {end_time - start_time} (s)')
-            # sort out the nearest k distance vehicles
-            if (len(distances) > self.surr_veh_num):
-                indices = get_indices_of_k_smallest(distances, self.surr_veh_num)
-            else:
-                indices = range(len(distances))
-            # append info of the nearest k distance vehicles
-            for i in indices:
-                # 濞ｈ濮炴稉鈧禍娑㈡绾板秶澧块悩鑸碘偓浣规殶閹癸拷
-                obs_state = input_data.obs.obs_state.add()
-                obs_state.x = vehicles_position.position_dict.get(around_moving_objs[i]).point.x
-                obs_state.y = vehicles_position.position_dict.get(around_moving_objs[i]).point.y
-                obs_state.phi = vehicles_position.position_dict.get(around_moving_objs[i]).phi
-                obs_state.vx = math.sqrt(vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).u**2 
-                                         + vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).v**2) * math.cos(obs_state.phi)
-
-                obs_state.vy = math.sqrt(vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).u**2 
-                                         + vehicles_MovingInfo.moving_info_dict.get(around_moving_objs[i]).v**2) * math.sin(obs_state.phi)
-                obs_state.length = vehicles_baseInfo.info_dict.get(around_moving_objs[i]).base_info.length
-                obs_state.width = vehicles_baseInfo.info_dict.get(around_moving_objs[i]).base_info.width
-
-                obs_state.type = obstacle_type_to_int('vehicle')
-                obs_state.id = id_to_numbers(around_moving_objs[i])
-                # print(f'the obs_state:{obs_state.x}{obs_state.y}')
-
-        input_data.ego.x = vehicles_position.position_dict.get(self.ego_id).point.x
-        input_data.ego.y = vehicles_position.position_dict.get(self.ego_id).point.y
-        input_data.ego.phi = vehicles_position.position_dict.get(self.ego_id).phi
-        input_data.ego.vx = vehicles_MovingInfo.moving_info_dict.get(self.ego_id).u
-        input_data.ego.vy = vehicles_MovingInfo.moving_info_dict.get(self.ego_id).v
-        input_data.ego.r = vehicles_MovingInfo.moving_info_dict.get(self.ego_id).w
-        input_data.ego.drive_mode = "auto"
-        input_data.time_stamp.t = self.timestamp         
-        self.timestamp += 1
 
     def covert_map(self, scenario_id):
         traffic_map = self.map_dict[scenario_id]
@@ -1416,7 +1234,6 @@ class LasvsimEnv(gym.Env):
         direction_list = []
         assert len(link_route) > 0, "link_route is empty"
         for i in range(len(link_route) - 1):
-            # 閼惧嘲褰囪ぐ鎾冲link閻ㄥ嫭澧嶉張澶夌瑓濞撶珮ink
             next_link_list = self.get_next_link(link_route[i])
             if link_route[i + 1] in next_link_list:
                 direction_list.append(self.get_link_direction(link_route[i]))
@@ -1475,14 +1292,10 @@ class LasvsimEnv(gym.Env):
         for i in range(len(lane_path) - 1):
             lane_path_phi.append(math.atan2(lane_path[i + 1].y - lane_path[i].y, lane_path[i + 1].x - lane_path[i].x))
         lane_path_phi = np.array(lane_path_phi)
-        # 鐠侊紕鐣婚懜顏勬倻鐟欐帒褰夐崠鏍电礉閼板啳妾荤搾濠呯箖 鍗よ熀 閻ㄥ嫭鍎忛崘锟�
         delta_phi = np.diff(lane_path_phi)
-        delta_phi = (delta_phi + np.pi) % (2 * np.pi) - np.pi  # 鐏忓棜顫楁惔锕€妯婅ぐ鎺嶇閸栨牕鍩� [-锜�, 锜篯
-
-        # 鐠侊紕鐣荤槐顖濐吀閻ㄥ嫯鍩呴崥鎴ｎ潡閸欐ê瀵�
+        delta_phi = (delta_phi + np.pi) % (2 * np.pi) - np.pi
         cumulative_phi_change = np.sum(delta_phi)
 
-        # 閸掋倖鏌囩槐顖濐吀閸欐ê瀵查柌锟�
         if cumulative_phi_change > np.radians(30):
             return "left"
         elif cumulative_phi_change < np.radians(-30):
@@ -1506,10 +1319,6 @@ class LasvsimEnv(gym.Env):
         return connection_id_list
 
     def convert_coordinates(self, x, y, source_origin, target_origin, angle):
-
-
-
-        # 鐠侊紕鐣婚惄绋款嚠娴滃孩绨崸鎰垼缁甯悙鍦畱閸ф劖鐖ｉ崑蹇曅�
         relative_x = x - source_origin[0]
         relative_y = y - source_origin[1]
 

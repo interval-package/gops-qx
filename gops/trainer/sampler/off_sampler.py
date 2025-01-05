@@ -13,7 +13,7 @@
 
 
 from typing import List, Union
-from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import timeit
+# from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import timeit
 from gops.trainer.sampler.base import BaseSampler, Experience
 
 

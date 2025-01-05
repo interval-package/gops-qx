@@ -15,6 +15,9 @@ class Config:
 
     seed: Optional[int] = None
     debug: bool = False
+    dense_ref_mode: str = "bezier"
+    # dense_ref_param set to None
+    dense_ref_param: Optional[Any] = None
 
     # ===== Env =====
     dt: float = 0.1  # Do not change this value.
@@ -45,6 +48,7 @@ class Config:
     P_long: float = 2.5
     P_phi: float = 20.0
     P_yaw: float = 10.0
+    P_vel: float = 3.0
     P_front: float = 5.0
     P_side: float = 5.0
     P_space: float = 5.0
@@ -105,12 +109,14 @@ class Config:
     obs_num_ref_points: int = 21
     obs_ref_interval: float = 5.0
     obs_ref_candidate_set: bool = False
-    random_ref_cooldown: int = 50
+    random_ref_cooldown: int = 30
+    choose_closest: bool = False
+    mid_line_obs: bool = True
     # For DrivingArea
     obs_driving_area_lidar_num_rays: int = 16
     obs_driving_area_lidar_range: float = 20.0
     # For SurState
-    obs_num_surrounding_vehicles: ObsNumSur = 5
+    obs_num_surrounding_vehicles: ObsNumSur = 0
     # For SurLidar
     obs_surrounding_lidar_num_rays: int = 16
     # For SurEncoding

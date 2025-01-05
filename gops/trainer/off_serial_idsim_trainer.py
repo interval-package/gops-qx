@@ -27,7 +27,7 @@ from gops.utils.tensorboard_setup import add_scalars, tb_tags
 from gops.utils.log_data import LogData
 from gops.trainer.off_serial_trainer import OffSerialTrainer
 from gops.trainer.idsim_train_evaluator import idsim_tb_tags_dict
-from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import timeit
+from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import timeit
 
 class OffSerialIdsimTrainer(OffSerialTrainer):
     def __init__(self, alg, sampler, buffer, evaluator, **kwargs):

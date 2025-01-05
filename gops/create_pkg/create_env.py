@@ -125,7 +125,6 @@ def create_env(
     :return: wrapped data type environment.
     """
     spec_ = registry.get(env_id)
-
     if spec_ is None:
         raise KeyError(f"No registered env with id: {env_id}")
 

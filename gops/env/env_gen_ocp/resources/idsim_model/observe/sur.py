@@ -27,15 +27,11 @@ def get_single_step_sur_obs(context: BaseContext, sur_obs_cur) -> torch.Tensor:
 def get_sur_obs(context: BaseContext, n: int) -> torch.Tensor:
     sur_obs_list = []
     sur_param = context.p.sur_param
-    # print("i: ",context.i)
-    # print("n: ",n)
     for i in range(context.i, context.i + n):
         sur_obs_cur = sur_param[:, i]
         sur_obs = get_single_step_sur_obs(context, sur_obs_cur)  # [B, M, d]
         sur_obs_list.append(sur_obs)
     mask = sur_obs_cur[:, :, -1]
-    # print("sur_obs_list shape: ",sur_obs_list)
-    # print("mask shape: ",mask)
     sur_obs = torch.stack(sur_obs_list, dim=-1)  # [B, M, d, N]
     sur_obs = sur_obs.reshape(sur_obs.shape[0], sur_obs.shape[1], -1)
 
@@ -48,5 +44,4 @@ def get_sur_obs(context: BaseContext, n: int) -> torch.Tensor:
     # [B, M, d]
     batch_size = sur_obs.shape[0]
     sur_obs = sur_obs.reshape(batch_size, -1)
-    # print("sur shape: ",sur_obs)
     return sur_obs

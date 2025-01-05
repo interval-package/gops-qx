@@ -5,7 +5,7 @@ import json
 from typing import Tuple
 
 from matplotlib import pyplot as plt
-from gops.env.env_gen_ocp.resources.idsim_model.lasvsim_env_qianxing import LasvsimEnv
+from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import LasvsimEnv
 from gops.env.env_gen_ocp.resources.idsim_model.utils.las_render import \
     LasStateSurrogate, RenderCfg, render_tags_debug,\
     load_from_pickle_iterable
