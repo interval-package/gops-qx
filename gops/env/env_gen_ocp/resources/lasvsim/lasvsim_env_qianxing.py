@@ -184,6 +184,7 @@ class LasvsimEnv():
             ref_list=[],
             sur_list=[]
         )
+        self.can_not_get_lane_id = False
         self.step_remote_lasvsim()
         self.update_lasvsim_context()
         self.render_flag = render_flag
@@ -586,6 +587,7 @@ class LasvsimEnv():
         min_front_dist = np.inf
 
         sur_list: List[SurroundingVehicle] = self.lasvsim_context.sur_list
+        sur_list = [sur for sur in sur_list if sur.mask==1]
         # sur_info = self.engine.context.vehicle.surrounding_veh_info
         # ego_edge = self.engine.context.vehicle.edge
         # ego_lane = self.engine.context.vehicle.lane
@@ -776,6 +778,9 @@ class LasvsimEnv():
             "MapOut": out_of_driving_area
         }
         done = collision or out_of_defined_region or out_of_driving_area
+        if done:
+            print('# DONE')
+            print(self._render_done_info)
         return done
 
     def get_ego_context(self, real_actiton: np.ndarray = None):
@@ -792,8 +797,7 @@ class LasvsimEnv():
         link_id = vehicles_position.position_dict.get(self.ego_id).link_id
         segment_id = vehicles_position.position_dict.get(
             self.ego_id).segment_id
-        ego_pos = vehicles_position.position_dict.get(
-            self.ego_id).position_type
+        ego_pos = vehicles_position.position_dict.get(self.ego_id).position_type
         in_junction = (ego_pos == 2)
 
         length = vehicles_baseInfo.info_dict.get(self.ego_id).base_info.length
@@ -804,17 +808,18 @@ class LasvsimEnv():
         w = vehicles_movingInfo.moving_info_dict.get(self.ego_id).w
 
         assert not in_junction
-        can_not_get_lane_id = False
+        self.can_not_get_lane_id = False
         try:
             target_lane = self.lanes[lane_id]
         except Exception as e:
             print('X'*50)
             print('can_not_get_lane_id')
-            can_not_get_lane_id = True
+            # breakpoint()
+            self.can_not_get_lane_id = True
 
-        if can_not_get_lane_id:
-            right_boundary_distance = 1.5
-            left_boundary_distance = 1.5
+        if self.can_not_get_lane_id:
+            right_boundary_distance = 1.75
+            left_boundary_distance = 1.75
         else:
             # print("Normal lane id")
             left1, right1 = calculate_perpendicular_points(
@@ -849,12 +854,14 @@ class LasvsimEnv():
             action = real_actiton
         else:
             action = np.array([0.0]*2)
+        state = np.array([x, y, u, v, phi, w])
         last_action = self.lasvsim_context.ego.action
 
         return EgoVehicle(
             x=x, y=y, phi=phi, u=u, v=v, w=w,
             length=length, width=width,
             action=action,
+            state=state,
             last_action=last_action,
             junction_id=junction_id, lane_id=lane_id,
             link_id=link_id, segment_id=segment_id,
@@ -871,11 +878,16 @@ class LasvsimEnv():
         if len(ref_lines)==0:
             print('X'*50)
             print("Zero ref!!!")
-            return self.lasvsim_context.ref_list
+            if not self.can_not_get_lane_id:
+                lane_id = self.lasvsim_context.ego.lane_id
+                target_lane = self.lanes[lane_id]
+                ref_line_xy = np.array([[p.point.x, p.point.y] for p in target_lane.center_line])
+                ref_line_string = LineString(ref_line_xy)
+                return [ref_line_string] * len(self.lasvsim_context.ref_list)
+            else:
+                return self.lasvsim_context.ref_list
         # print("Normal ref")
         ref_context = []
-        # assert len(ref_lines) > 0
-        # assert len(ref_lines[0].points) > 1
         for ref_line in ref_lines:
             ref_line_xy = np.array([[point.x, point.y]
                                 for point in ref_line.points])
