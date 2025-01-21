@@ -232,6 +232,9 @@ class idSimEnvPlanning(idSimEnv):
         self._info = self._get_info(info)
         self._info["critic_comps"] = self.cum_critic_comps_list[opt_ref_index]
 
+        # render
+        self.step_render(reward=reward, mf_reward=total_reward)
+
         # if not terminated:
         #     total_reward = np.maximum(total_reward, 0.05)
 

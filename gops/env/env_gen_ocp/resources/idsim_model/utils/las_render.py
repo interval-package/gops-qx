@@ -86,13 +86,13 @@ class RenderCfg:
 
 @dataclass
 class LasStateSurrogate:
-    _state:             np.ndarray
-    _ref_points:        np.ndarray
-    action:             np.ndarray
-    _ego:               np.ndarray
-    _render_surcars:    list
-    _render_info:       dict
-    _render_done_info:  dict
+    _state:             np.ndarray = None
+    _ref_points:        np.ndarray = None
+    action:             np.ndarray = None
+    _ego:               np.ndarray = None
+    _render_surcars:    list = None
+    _render_info:       dict = None
+    _render_done_info:  dict = None
 
     # adaptive vars
     _debug_adaptive_vars: dict = None

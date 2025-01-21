@@ -70,8 +70,8 @@ if __name__ == "__main__":
     parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
     parser.add_argument("--scenerios_list", type=list, default=[':19','19:'])
 
-    parser.add_argument("--vector_env_num", type=int, default=4, help="Number of vector envs")
-    parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
+    # parser.add_argument("--vector_env_num", type=int, default=10, help="Number of vector envs")
+    # parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
     parser.add_argument("--gym2gymnasium", type=bool, default=True, help="Convert Gym-style env to Gymnasium-style")
 
     parser.add_argument("--ego_scale", type=list, default=[1, 20, 20, 1, 4, 1, 4] ) #  vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
     # 1.1 Parameters for qianxing
     # using `qianxingp_` + `value`
-    parser.add_argument("--qianxingp_task_id", type=int, default=119, help="Qianxing task id")
+    parser.add_argument("--qianxingp_task_id", type=int, default=126, help="Qianxing task id")
     # parser.add_argument("--qianxingp_token", type=int, default=None, help="Qianxing token")
     parser.add_argument("--qianxingp_traj_flag", type=bool, default=False, help="Qianxing traj saver")
     parser.add_argument("--qianxingp_render_flag", type=bool, default=False, help="Qianxing traj render")
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--trainer",
         type=str,
-        default='off_serial_idsim_trainer', #"off_serial_idsim_trainer",off_async_trainer
+        default='off_parallel_idsim_trainer', #"off_serial_idsim_trainer",off_async_trainer
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
     # Maximum iteration number
@@ -240,7 +240,7 @@ if __name__ == "__main__":
         "--ini_network_dir",
         type=str,
         default=None
-        # default='/home/zhangjiulin/gops-grpc/results/pyth_idsim/DSACTPI_240904-140928/apprfunc/apprfunc_133000.pkl'
+        # default='/home/idlab/code/qx-oracle/results/pyth_lasvsim_planning/DSACTPI_250115-192548/apprfunc/apprfunc_100000.pkl'
     )
     trainer_type = parser.parse_known_args()[0].trainer
     # 4.1. Parameters for off_serial_trainer
@@ -274,14 +274,14 @@ if __name__ == "__main__":
     # 6. Parameters for evaluator
     parser.add_argument("--evaluator_name", type=str, default="idsim_train_evaluator")
     parser.add_argument("--num_eval_episode", type=int, default=10)
-    parser.add_argument("--eval_interval", type=int, default=5000)
+    parser.add_argument("--eval_interval", type=int, default=1000)
     parser.add_argument("--eval_save", type=str, default=False, help="save evaluation data")
 
     ################################################
     # 7. Data savings
     parser.add_argument("--save_folder", type=str, default=None)
     # Save value/policy every N updates
-    parser.add_argument("--apprfunc_save_interval", type=int, default=50000)
+    parser.add_argument("--apprfunc_save_interval", type=int, default=10000)
     # Save key info every N updates
     parser.add_argument("--log_save_interval", type=int, default=1000)
 
@@ -311,8 +311,8 @@ if __name__ == "__main__":
     qianxing_config["traj_flag"] = False
     # The config is inited and the path specified, hence no more modification
     args["qx_config"] = qianxing_config
-    env = create_env(**{**args, "vector_env_num": None})
-    # env = create_env(**args)
+    # env = create_env(**{**args, "vector_env_num": None})
+    env = create_env(**args)
     args = init_args(env, **args)
 
     # start_tensorboarsd(args["save_folder"])

@@ -25,7 +25,7 @@ from gops.utils.common_utils import ModuleOnDevice
 from gops.utils.parallel_task_manager import TaskPool
 from gops.utils.tensorboard_setup import add_scalars, tb_tags
 from gops.utils.log_data import LogData
-from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import timeit
+# from gops.env.env_gen_ocp.resources.lasvsim.lasvsim_env_qianxing import timeit
 
 class OffSerialTrainer:
     def __init__(self, alg, sampler, buffer, evaluator, **kwargs):
@@ -76,7 +76,7 @@ class OffSerialTrainer:
 
         self.start_time = time.time()
         
-    @timeit
+    # @timeit
     def step(self):
         # sampling
         if self.iteration % self.sample_interval == 0:
@@ -187,3 +187,13 @@ class OffSerialTrainer:
             self.evaluator.run_evaluation.remote(self.iteration)
         )
         self.last_eval_iteration = self.iteration
+    
+    def _add_sample_task(self):
+        with torch.no_grad():
+            if (self.iteration - self.last_sampler_network_update_iteration) >= self.sampler_network_update_interval:
+                self.last_sampler_network_update_iteration = self.iteration
+                self.sampler.load_state_dict.remote(self.networks.state_dict())
+            self.sampler_tasks.add(
+                self.sampler,
+                self.sampler.sample.remote()
+            )

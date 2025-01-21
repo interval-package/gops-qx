@@ -68,6 +68,12 @@ def create_sampler(env_options: Union[dict, List[dict]]=None, **kwargs) -> objec
     trainer_name = _kwargs.get("trainer", None)
     if trainer_name is None or trainer_name.startswith("off_serial") or trainer_name.startswith("on_serial"):
         sam = sampler_creator(env_options=env_options, **_kwargs)
+    elif  trainer_name.startswith("off_parallel"):
+        import ray
+        if _kwargs["use_gpu"]:
+            sam = ray.remote(num_gpus=0.5)(sampler_creator).remote( **_kwargs)
+        else:
+            sam = ray.remote(num_cpus=1)(sampler_creator).remote( **_kwargs)
     elif (
         trainer_name.startswith("off_async")
         or trainer_name.startswith("off_sync")

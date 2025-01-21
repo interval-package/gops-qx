@@ -11,7 +11,6 @@ import os
 from shapely.geometry import Point, LineString, Polygon
 from gops.utils.math_utils import deal_with_phi_rad, convert_ref_to_ego_coord
 import matplotlib.pyplot as plt
-from gops.utils.map_tool.utils import path_discrete_t_new
 from risenlighten.lasvsim.train_sim.api.trainsim import trainsim_pb2
 from risenlighten.lasvsim.train_sim.api.trainsim import trainsim_pb2_grpc
 from risenlighten.lasvsim.train_sim.api.trainsim import scenario_pb2
@@ -28,13 +27,13 @@ from gops.env.env_gen_ocp.resources.idsim_model.utils.las_render import \
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from gops.env.env_gen_ocp.resources.lib import point_project_to_line, \
-    compute_waypoints_by_intervals, compute_waypoint, \
+    compute_waypoint, \
     create_box_polygon
 from gops.env.env_gen_ocp.resources.lasvsim.log_utils import LoggingInterceptor
 from gops.env.env_gen_ocp.resources.lasvsim.utils import \
     inverse_normalize_action, cal_dist, \
     get_indices_of_k_smallest, convert_ground_coord_to_ego_coord, \
-    calculate_perpendicular_points, timeit
+    calculate_perpendicular_points
 
 from dataclasses import dataclass
 
@@ -345,12 +344,18 @@ class LasvsimEnv():
             np.abs(ego_r) + 2,
         )  # 0~1  0~8 degree/s 50% 0~2 degree/s
 
-        punish_overspeed = np.clip(
-            np.where(
-                ego_vx > 1.05 * ref_v,
-                1 + np.abs(ego_vx - 1.05 * ref_v),
-                0, ),
-            0, 2)
+        # punish_overspeed = np.clip(
+        #     np.where(
+        #         ego_vx > 1.05 * ref_v,
+        #         1 + np.abs(ego_vx - 1.05 * ref_v),
+        #         0, ),
+        #     0, 2)
+        punish_overspeed = np.zeros(ref_param.shape[0])
+        index_lowspeed = ego_vx < ref_v
+        punish_overspeed[index_lowspeed] = 2 * (1 - ego_vx / ref_v[index_lowspeed])
+        index_overspeed = ego_vx > 1.1 * ref_v
+        punish_overspeed[index_overspeed] = (1 + ego_vx - ref_v[index_overspeed])
+        punish_overspeed = np.clip(punish_overspeed, 0, 2)
 
         # reward related to action
         nominal_steer = self._get_nominal_steer_by_state_batch(
@@ -628,6 +633,8 @@ class LasvsimEnv():
                         (np.abs(ego_vx*np.sin(delta_phi))+0.01)), 0., 1.),
                 0,
             )
+            # print("sur:", sur_L, sur_W)
+            # breakpoint()
             pun2side = np.maximum(pun2side, pun2side_cur)
             pun2side_sum += pun2side_cur
 
@@ -778,9 +785,9 @@ class LasvsimEnv():
             "MapOut": out_of_driving_area
         }
         done = collision or out_of_defined_region or out_of_driving_area
-        if done:
-            print('# DONE')
-            print(self._render_done_info)
+        # if done:
+        #     print('# DONE')
+        #     print(self._render_done_info)
         return done
 
     def get_ego_context(self, real_actiton: np.ndarray = None):
@@ -812,8 +819,8 @@ class LasvsimEnv():
         try:
             target_lane = self.lanes[lane_id]
         except Exception as e:
-            print('X'*50)
-            print('can_not_get_lane_id')
+            # print('X'*50)
+            # print('can_not_get_lane_id')
             # breakpoint()
             self.can_not_get_lane_id = True
 
@@ -876,8 +883,8 @@ class LasvsimEnv():
         # breakpoint()
         ref_lines = ref_points.reference_lines
         if len(ref_lines)==0:
-            print('X'*50)
-            print("Zero ref!!!")
+            # print('X'*50)
+            # print("Zero ref!!!")
             if not self.can_not_get_lane_id:
                 lane_id = self.lasvsim_context.ego.lane_id
                 target_lane = self.lanes[lane_id]
@@ -898,6 +905,9 @@ class LasvsimEnv():
     def get_sur_context(self):
         perception_info = self.get_remote_lasvsim_perception_info()
         around_moving_objs = perception_info.list
+        # print("Peerception: -------------------")
+        # print(perception_info)
+        # breakpoint()
         self._render_parse_surcar(around_moving_objs)
 
         ego_x, ego_y, ego_phi = self.lasvsim_context.ego.x, \
@@ -1138,22 +1148,25 @@ class LasvsimEnv():
     def _render_save_traj(self):
 
         _debug_adaptive_vars = {
-            # "_debug_dyn_state"    : self._debug_dyn_state.numpy(),
-            "_debug_done_errlat": self._debug_done_errlat,
-            # "_debug_done_errlon"  : self._debug_done_errlon ,
-            "_debug_done_errhead": self._debug_done_errhead,
-            "_debug_done_postype": self._debug_done_postype,
-            "_debug_reward_scaled_punish_boundary": self._debug_reward_scaled_punish_boundary,
+            # # "_debug_dyn_state"    : self._debug_dyn_state.numpy(),
+            # "_debug_done_errlat": self._debug_done_errlat,
+            # # "_debug_done_errlon"  : self._debug_done_errlon ,
+            # "_debug_done_errhead": self._debug_done_errhead,
+            # "_debug_done_postype": self._debug_done_postype,
+            # "_debug_reward_scaled_punish_boundary": self._debug_reward_scaled_punish_boundary,
         }
 
         # filter save, make a triger to save vital cases.
         obj = \
             LasStateSurrogate(
                 # Basic draw
-                self._state,
-                self._ref_points,
-                self.action,
-                self._ego[:6].astype(np.float32),
+                self.lasvsim_context.ego.state, 
+                None,
+                None,
+                None,
+                # self._ref_points,
+                # self.action,
+                # self._state[:6].astype(np.float32),
                 self._render_surcars,
                 self._render_info,
                 self._render_done_info,
@@ -1183,6 +1196,8 @@ class LasvsimEnv():
         original_nei = self._render_surcars
 
         f, ax = plt.gcf(), plt.gca()
+        self._state = self.lasvsim_context.ego.state # x, y, vx, vy, phi, w
+        self.action = self.lasvsim_context.ego.action
         ego_x, ego_y = self._state[0], self._state[1]
         phi = self._state[4]
         dx, dy = self._render_cfg.arrow_len * \
@@ -1195,9 +1210,9 @@ class LasvsimEnv():
         dot = plt.scatter(ego_x, ego_y, color='red', s=10)
         self._render_ego_shadows.append((dot, arrow))
 
-        ref_x, ref_y = self._ref_points[:, 0], self._ref_points[:, 1]
-        ref_lines = plt.plot(ref_x, ref_y, ls="dotted",
-                             color="red", linewidth=8)
+        # ref_x, ref_y = self._ref_points[:, 0], self._ref_points[:, 1]
+        # ref_lines = plt.plot(ref_x, ref_y, ls="dotted",
+        #                      color="red", linewidth=8)
 
         # reward, reward_info = self._buffered_reward
         text_strs = [
@@ -1266,9 +1281,10 @@ class LasvsimEnv():
                 car_rectangles.append(
                     draw_car(center_x, center_y, length, width, phi, obj_id))
                 plt.gca().add_patch(car_rectangles[-1][0])
-
-        ego_car_t = draw_car(float(self._ego[0]), float(self._ego[1]), float(
-            self._ego[4]), float(self._ego[5]), self._state[4], "pink", "ego")
+        length = self.lasvsim_context.ego.length
+        width = self.lasvsim_context.ego.width
+        ego_car_t = draw_car(float(self._state[0]), float(self._state[1]), 
+                             length, width, self._state[4], "pink", "ego")
         plt.gca().add_patch(ego_car_t[0])
         car_rectangles.append(ego_car_t)
 
@@ -1285,8 +1301,8 @@ class LasvsimEnv():
             text_obj.remove()
         for car in car_rectangles:
             remove_car(car)
-        for line in ref_lines:
-            line.remove()
+        # for line in ref_lines:
+        #     line.remove()
 
         if len(self._render_ego_shadows) > 30:
             ego = self._render_ego_shadows.popleft()
